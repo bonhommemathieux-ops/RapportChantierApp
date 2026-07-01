@@ -18,6 +18,6 @@
     <path d="M -8 -80 L 8 -80 L 8 60 L -8 60 Z" fill="#7c2d12" opacity="0.5"/>
   </g>
   <!-- Texte RJ (Rapport Journalier) -->
-  <text x="256" y="410" text-anchor="middle" font-family="Arial, sans-serif" font-size="72" font-weight="900" fill="#f8fafc" letter-spacing="4">RJC</text>
+  <text x="256" y="410" text-anchor="middle" font-family="Arial, sans-serif" font-size="72" font-weight="900" fill="#f8fafc" letter-spacing="4">FCTP</text>
   <text x="256" y="450" text-anchor="middle" font-family="Arial, sans-serif" font-size="22" font-weight="600" fill="#94a3b8" letter-spacing="2">RAPPORT CHANTIER</text>
 </svg>

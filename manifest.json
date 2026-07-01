@@ -1,7 +1,7 @@
 {
-  "name": "Rapport Journalier de Chantier",
-  "short_name": "Rapport Chantier",
-  "description": "Saisie et envoi par mail du rapport journalier de chantier",
+  "name": "Rapport Chantier FCTP",
+  "short_name": "Chantier FCTP",
+  "description": "Rapport journalier de chantier FCTP — saisie et envoi par mail",
   "start_url": "./index.html",
   "display": "standalone",
   "orientation": "portrait",

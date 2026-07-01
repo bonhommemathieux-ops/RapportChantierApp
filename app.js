@@ -326,7 +326,7 @@ const buildPDF = async (data) => {
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
-  doc.text('RAPPORT JOURNALIER DE CHANTIER', M + 25, 14);
+  doc.text('RAPPORT CHANTIER FCTP', M + 25, 14);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
   doc.text(`${data.chantier || '—'}${data.jour ? '  •  Jour n°' + data.jour : ''}`, M + 25, 21);
