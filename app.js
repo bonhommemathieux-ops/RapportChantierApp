@@ -82,29 +82,6 @@ const STORAGE_KEY = 'rjc_draft_v1';
 const state = { photos: [], meteo: '' };
 
 const templates = {
-  effectif: () => `
-    <div class="row-item wide">
-      <input type="text" class="f-nom" placeholder="Entreprise / équipe" />
-      <input type="text" class="f-role" placeholder="Corps d'état / rôle" />
-      <input type="number" class="f-nb" placeholder="Nb" min="0" />
-      <button type="button" class="btn-remove" data-remove>✕</button>
-    </div>`,
-  travail: () => `
-    <div class="row-item wide">
-      <select class="f-desc-select">
-        <option value="">— Choisir la tâche —</option>
-        <option value="Marquages">Marquages</option>
-        <option value="Rabotage">Rabotage</option>
-        <option value="Terrassement">Terrassement</option>
-        <option value="Boisages">Boisages</option>
-        <option value="Pose de tubes">Pose de tubes</option>
-        <option value="Remblai">Remblai</option>
-        <option value="__autre__">Autre (préciser)…</option>
-      </select>
-      <input type="text" class="f-loc" placeholder="Localisation" />
-      <input type="text" class="f-qte" placeholder="Qté (ml, m²...)" />
-      <button type="button" class="btn-remove" data-remove>✕</button>
-    </div>`,
   engin: () => `
     <div class="row-item">
       <input type="text" class="f-nom" placeholder="Ex : Pelle 8T, camion benne" />
@@ -120,7 +97,7 @@ const templates = {
 };
 
 const containers = {
-  effectif: 'effectifs', travail: 'travaux', engin: 'engins', livraison: 'livraisons',
+  engin: 'engins', livraison: 'livraisons',
 };
 
 const addRow = (type) => {
@@ -141,19 +118,7 @@ document.addEventListener('click', (e) => {
   }
 });
 
-document.addEventListener('change', (e) => {
-  if (e.target.matches('.f-desc-select') && e.target.value === '__autre__') {
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.className = 'f-desc';
-    input.placeholder = 'Décris la tâche...';
-    e.target.replaceWith(input);
-    input.focus();
-    persist();
-  }
-});
-
-['effectif', 'travail', 'engin', 'livraison'].forEach(addRow);
+['engin', 'livraison'].forEach(addRow);
 
 document.querySelectorAll('.weather-btn').forEach((btn) => {
   btn.addEventListener('click', () => {
@@ -226,11 +191,8 @@ const collectRows = (containerId, fields) => {
   return [...document.querySelectorAll(`#${containerId} .row-item`)].map((row) => {
     const obj = {};
     fields.forEach((f) => {
-      let el = row.querySelector('.f-' + f);
-      if (!el && f === 'desc') el = row.querySelector('.f-desc-select');
-      let val = el ? el.value.trim() : '';
-      if (val === '__autre__') val = '';
-      obj[f] = val;
+      const el = row.querySelector('.f-' + f);
+      obj[f] = el ? el.value.trim() : '';
     });
     return obj;
   }).filter((r) => Object.values(r).some((v) => v));
@@ -246,8 +208,6 @@ const collectData = () => ({
   tempMin: $('tempMin').value,
   tempMax: $('tempMax').value,
   meteoObs: $('meteoObs').value.trim(),
-  effectifs: collectRows('effectifs', ['nom', 'role', 'nb']),
-  travaux: collectRows('travaux', ['desc', 'loc', 'qte']),
   engins: collectRows('engins', ['nom', 'heures']),
   livraisons: collectRows('livraisons', ['nom', 'qte']),
   secObs: $('secObs').value.trim(),
@@ -255,8 +215,6 @@ const collectData = () => ({
   visiteurs: $('visiteurs').value.trim(),
   obsGen: $('obsGen').value.trim(),
   prevu: $('prevu').value.trim(),
-  destinataires: $('destinataires').value.trim(),
-  cc: $('cc').value.trim(),
 });
 
 const persist = () => {
@@ -283,13 +241,10 @@ const restore = () => {
     $('visiteurs').value = data.visiteurs || '';
     $('obsGen').value = data.obsGen || '';
     $('prevu').value = data.prevu || '';
-    if (data.destinataires) $('destinataires').value = data.destinataires;
-    if (data.cc) $('cc').value = data.cc;
     if (data.meteo) {
       const btn = document.querySelector(`.weather-btn[data-val="${data.meteo}"]`);
       if (btn) { btn.classList.add('active'); state.meteo = data.meteo; }
     }
-    const PRESET = ['Marquages', 'Rabotage', 'Terrassement', 'Boisages', 'Pose de tubes', 'Remblai'];
     const fill = (containerId, type, fields, items) => {
       const c = $(containerId);
       c.innerHTML = '';
@@ -297,28 +252,11 @@ const restore = () => {
         addRow(type);
         const row = c.lastElementChild;
         fields.forEach((f) => {
-          if (f === 'desc' && type === 'travail') {
-            const sel = row.querySelector('.f-desc-select');
-            const val = it[f] || '';
-            if (!val) { sel.value = ''; return; }
-            if (PRESET.includes(val)) { sel.value = val; }
-            else {
-              const input = document.createElement('input');
-              input.type = 'text';
-              input.className = 'f-desc';
-              input.placeholder = 'Décris la tâche...';
-              input.value = val;
-              sel.replaceWith(input);
-            }
-            return;
-          }
           const el = row.querySelector('.f-' + f);
           if (el) el.value = it[f] || '';
         });
       });
     };
-    fill('effectifs', 'effectif', ['nom', 'role', 'nb'], data.effectifs);
-    fill('travaux', 'travail', ['desc', 'loc', 'qte'], data.travaux);
     fill('engins', 'engin', ['nom', 'heures'], data.engins);
     fill('livraisons', 'livraison', ['nom', 'qte'], data.livraisons);
     if (photos && photos.length) { state.photos = photos; renderPhotos(); }
@@ -386,32 +324,6 @@ const buildPDF = async (data) => {
     doc.text(lines, M, y); y += lines.length * 4.5 + 2;
   }
   y += 2;
-
-  if (data.effectifs.length) {
-    addTitle('Effectifs & sous-traitants présents');
-    doc.autoTable({
-      startY: y,
-      head: [['Entreprise / équipe', 'Corps d\'état', 'Nb pers.']],
-      body: data.effectifs.map((e) => [e.nom, e.role, e.nb]),
-      styles: { fontSize: 9, cellPadding: 2 },
-      headStyles: { fillColor: [30, 41, 59], textColor: 255, fontStyle: 'bold' },
-      margin: { left: M, right: M },
-    });
-    y = doc.lastAutoTable.finalY + 4;
-  }
-
-  if (data.travaux.length) {
-    addTitle('Travaux réalisés & avancement');
-    doc.autoTable({
-      startY: y,
-      head: [['Description', 'Localisation', 'Quantité']],
-      body: data.travaux.map((t) => [t.desc, t.loc, t.qte]),
-      styles: { fontSize: 9, cellPadding: 2 },
-      headStyles: { fillColor: [30, 41, 59], textColor: 255, fontStyle: 'bold' },
-      margin: { left: M, right: M },
-    });
-    y = doc.lastAutoTable.finalY + 4;
-  }
 
   if (data.engins.length) {
     addTitle('Matériel présent');
@@ -499,34 +411,6 @@ const buildPDF = async (data) => {
   return doc;
 };
 
-$('btnSend').addEventListener('click', async () => {
-  const data = collectData();
-  if (!data.chantier || !data.date) { toast('Renseigne au minimum le chantier et la date', 'error'); return; }
-  if (!data.destinataires) { toast('Renseigne au moins un destinataire', 'error'); return; }
-  toast('Génération du PDF...');
-  try {
-    const doc = await buildPDF(data);
-    const dateStr = data.date || new Date().toISOString().slice(0, 10);
-    const cleanChantier = (data.chantier || 'chantier').replace(/[^a-zA-Z0-9_-]+/g, '_').slice(0, 40);
-    const fileName = `Rapport_${cleanChantier}_${dateStr}.pdf`;
-    doc.save(fileName);
-    setTimeout(() => {
-      const subject = `Rapport journalier chantier ${data.chantier} — ${formatDateFR(data.date)}`;
-      const bodyLines = [
-        'Bonjour,', '',
-        `Veuillez trouver ci-joint le rapport journalier du chantier ${data.chantier} pour la journée du ${formatDateFR(data.date)}.`, '',
-        '⚠️ Le PDF a été téléchargé sur votre appareil. Merci de le JOINDRE à ce mail avant l\'envoi.',
-        `Fichier : ${fileName}`, '', 'Cordialement,', data.redacteur || '',
-      ];
-      const body = encodeURIComponent(bodyLines.join('\r\n'));
-      const to = encodeURIComponent(data.destinataires);
-      const cc = data.cc ? '&cc=' + encodeURIComponent(data.cc) : '';
-      window.location.href = `mailto:${to}?subject=${encodeURIComponent(subject)}${cc}&body=${body}`;
-      toast('PDF téléchargé — joins-le au mail ouvert', 'success');
-    }, 600);
-  } catch (err) { console.error(err); toast('Erreur lors de la génération du PDF', 'error'); }
-});
-
 $('btnShare').addEventListener('click', async () => {
   const data = collectData();
   if (!data.chantier || !data.date) { toast('Renseigne au minimum le chantier et la date', 'error'); return; }
@@ -553,6 +437,18 @@ $('btnReset').addEventListener('click', () => {
 // =============================================================================
 const PT_KEY = 'pointage_v1';
 const ENTREPRISES = ['FCTP', 'LMC', 'Lusoloc', 'STATR', 'Tadielo', 'Assciage', 'LHERM', 'Autre'];
+
+const COMPAGNONS_LMC = [
+  { nom: 'AHMADZAI KHALID', ent: 'LMC' },
+  { nom: 'BEYAZIT HIYASETTIN', ent: 'LMC' },
+  { nom: 'FAQIRI ESMATULLAH', ent: 'LMC' },
+  { nom: 'HAZARBOZ WAHAB', ent: 'LMC' },
+  { nom: 'AHMADZAI ISHFAQ', ent: 'LMC' },
+  { nom: 'KHAN MUSAA', ent: 'LMC' },
+  { nom: 'AHMADZAI JANZEEB', ent: 'LMC' },
+  { nom: 'WALIZADA WAHIDULLAH', ent: 'LMC' },
+  { nom: 'KOCHAI TAYYAB', ent: 'LMC' },
+];
 
 const ptTemplate = () => `
   <div class="row-item pointage-row">
@@ -603,7 +499,6 @@ const collectPointage = () => {
     date: $('pt-date').value,
     chantier: $('pt-chantier').value.trim(),
     chef: $('pt-chef').value.trim(),
-    mail: $('pt-mail').value.trim(),
     compagnons,
   };
 };
@@ -630,7 +525,6 @@ const restorePointage = () => {
     $('pt-date').value = d.date || new Date().toISOString().slice(0, 10);
     $('pt-chantier').value = d.chantier || '';
     $('pt-chef').value = d.chef || '';
-    if (d.mail) $('pt-mail').value = d.mail;
     $('pt-compagnons').innerHTML = '';
     (d.compagnons && d.compagnons.length ? d.compagnons : [{}]).forEach(ptAddRow);
     updatePointage();
@@ -638,6 +532,21 @@ const restorePointage = () => {
 };
 
 $('pt-add').addEventListener('click', () => { ptAddRow(); updatePointage(); });
+
+$('pt-load-lmc').addEventListener('click', () => {
+  const rows = [...document.querySelectorAll('#pt-compagnons .pointage-row')];
+  const nomsPresents = new Set(rows.map(r => r.querySelector('.p-nom').value.trim().toUpperCase()).filter(Boolean));
+  const container = $('pt-compagnons');
+  if (rows.length === 1 && !rows[0].querySelector('.p-nom').value.trim()) container.innerHTML = '';
+  let added = 0;
+  COMPAGNONS_LMC.forEach(c => {
+    if (nomsPresents.has(c.nom.toUpperCase())) return;
+    ptAddRow(c);
+    added++;
+  });
+  updatePointage();
+  toast(added ? `Équipe LMC chargée (${added} ajout${added > 1 ? 's' : ''})` : 'Équipe LMC déjà présente', 'success');
+});
 $('tab-pointage').addEventListener('input', updatePointage);
 $('tab-pointage').addEventListener('change', updatePointage);
 $('pt-compagnons').addEventListener('click', (e) => {
@@ -738,27 +647,6 @@ $('pt-share').addEventListener('click', async () => {
   } catch (err) { console.error(err); toast('Erreur PDF', 'error'); }
 });
 
-$('pt-pdf').addEventListener('click', async () => {
-  const d = collectPointage();
-  if (!d.compagnons.length) { toast('Aucun compagnon saisi', 'error'); return; }
-  toast('Génération du PDF...');
-  try {
-    const doc = await buildPointagePDF(d);
-    const chan = (d.chantier || 'chantier').replace(/[^a-zA-Z0-9_-]+/g, '_').slice(0, 30);
-    const dt = d.date || new Date().toISOString().slice(0, 10);
-    const fileName = `Pointage_${chan}_${dt}.pdf`;
-    doc.save(fileName);
-    if (d.mail) {
-      setTimeout(() => {
-        const subject = `Pointage ${d.chantier} — ${formatDateFR(d.date)}`;
-        const body = encodeURIComponent(`Bonjour,\n\nPointage journalier ci-joint (${d.compagnons.length} compagnons, ${formatHM(d.compagnons.reduce((s, c) => s + c.heures, 0))}).\n\n⚠️ Merci de joindre le PDF téléchargé (${fileName}) au mail.\n\nCordialement,\n${d.chef || ''}`);
-        window.location.href = `mailto:${encodeURIComponent(d.mail)}?subject=${encodeURIComponent(subject)}&body=${body}`;
-      }, 600);
-    }
-    toast('PDF téléchargé', 'success');
-  } catch (err) { console.error(err); toast('Erreur PDF', 'error'); }
-});
-
 restorePointage();
 
 // =============================================================================
@@ -810,7 +698,6 @@ const collectAvancement = () => {
   return {
     date: $('av-date').value,
     chantier: $('av-chantier').value.trim(),
-    mail: $('av-mail').value.trim(),
     taches,
   };
 };
@@ -848,7 +735,6 @@ const restoreAvancement = () => {
     const d = raw ? JSON.parse(raw) : {};
     $('av-date').value = d.date || new Date().toISOString().slice(0, 10);
     $('av-chantier').value = d.chantier || '';
-    if (d.mail) $('av-mail').value = d.mail;
     $('av-taches').innerHTML = '';
     (d.taches && d.taches.length ? d.taches : [{}]).forEach(avAddRow);
     updateAvancement();
@@ -987,27 +873,6 @@ $('av-share').addEventListener('click', async () => {
     const title = `Avancement ${d.chantier} — ${formatDateFR(d.date)}`;
     const text = `Suivi avancement ${d.chantier} du ${formatDateFR(d.date)} : ${d.taches.length} tâches suivies.`;
     await sharePDF(doc, fileName, title, text);
-  } catch (err) { console.error(err); toast('Erreur PDF', 'error'); }
-});
-
-$('av-pdf').addEventListener('click', async () => {
-  const d = collectAvancement();
-  if (!d.taches.length) { toast('Aucune tâche saisie', 'error'); return; }
-  toast('Génération du PDF...');
-  try {
-    const doc = await buildAvancementPDF(d);
-    const chan = (d.chantier || 'chantier').replace(/[^a-zA-Z0-9_-]+/g, '_').slice(0, 30);
-    const dt = d.date || new Date().toISOString().slice(0, 10);
-    const fileName = `Avancement_${chan}_${dt}.pdf`;
-    doc.save(fileName);
-    if (d.mail) {
-      setTimeout(() => {
-        const subject = `Suivi avancement ${d.chantier} — ${formatDateFR(d.date)}`;
-        const body = encodeURIComponent(`Bonjour,\n\nSuivi d'avancement chantier ci-joint.\n\n⚠️ Merci de joindre le PDF téléchargé (${fileName}) au mail.\n\nCordialement`);
-        window.location.href = `mailto:${encodeURIComponent(d.mail)}?subject=${encodeURIComponent(subject)}&body=${body}`;
-      }, 600);
-    }
-    toast('PDF téléchargé', 'success');
   } catch (err) { console.error(err); toast('Erreur PDF', 'error'); }
 });
 

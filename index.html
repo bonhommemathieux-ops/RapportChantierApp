@@ -94,20 +94,6 @@
       </section>
 
       <section class="section">
-        <h2>Effectifs & sous-traitants présents</h2>
-        <div id="effectifs" class="row-list"></div>
-        <button type="button" class="btn-add" data-add="effectif">+ Ajouter une entreprise / équipe</button>
-        <p class="hint">Renseigne le nom, l'effectif présent et les heures.</p>
-      </section>
-
-      <section class="section">
-        <h2>Travaux réalisés & avancement</h2>
-        <div id="travaux" class="row-list"></div>
-        <button type="button" class="btn-add" data-add="travail">+ Ajouter une tâche</button>
-        <p class="hint">Suggestions : marquages, rabotage, terrassement, boisages, pose de tubes, remblai — ou tape ta propre description.</p>
-      </section>
-
-      <section class="section">
         <h2>Matériel & livraisons</h2>
         <div class="header-row">
           <label style="margin:0">Engins présents sur site</label>
@@ -160,19 +146,6 @@
         <div id="photoGrid" class="photo-grid"></div>
       </section>
 
-      <section class="section">
-        <h2>Envoi par mail</h2>
-        <div>
-          <label for="destinataires">Destinataires (séparés par une virgule)</label>
-          <input type="text" id="destinataires" placeholder="ex : conducteur@entreprise.fr, moe@bureau.fr" value="mathieu.bonhomme@fctp.fr">
-        </div>
-        <div style="margin-top:12px">
-          <label for="cc">CC (optionnel)</label>
-          <input type="text" id="cc" placeholder="ex : direction@entreprise.fr">
-        </div>
-        <p class="hint">Le PDF sera téléchargé, puis ton client mail s'ouvrira. <strong>Joins le PDF téléchargé au mail avant de l'envoyer.</strong></p>
-      </section>
-
     </form>
   </section>
 
@@ -202,22 +175,16 @@
     <section class="section">
       <h2>Compagnons</h2>
       <div id="pt-compagnons" class="row-list"></div>
-      <button type="button" class="btn-add" id="pt-add">+ Ajouter un compagnon</button>
+      <div class="btn-row">
+        <button type="button" class="btn-add" id="pt-add">+ Ajouter un compagnon</button>
+        <button type="button" class="btn-add btn-add-lmc" id="pt-load-lmc">👷 Charger équipe LMC (9 pers.)</button>
+      </div>
       <p class="hint">Renseigne arrivée, départ, pause déjeuner (en minutes). Le total est calculé automatiquement.</p>
 
       <div class="totals" id="pt-totals" style="margin-top:14px">
         <div class="total-line"><span>Effectif</span><strong id="pt-total-nb">0</strong></div>
         <div class="total-line"><span>Total heures</span><strong id="pt-total-h">0h00</strong></div>
       </div>
-    </section>
-
-    <section class="section">
-      <h2>Envoi</h2>
-      <div>
-        <label for="pt-mail">Destinataires</label>
-        <input type="text" id="pt-mail" placeholder="mail1@..., mail2@..." value="mathieu.bonhomme@fctp.fr">
-      </div>
-      <p class="hint">Export Excel (.xlsx) ou PDF ci-dessous. Le fichier téléchargé peut être joint au mail.</p>
     </section>
 
   </section>
@@ -255,14 +222,6 @@
       </div>
     </section>
 
-    <section class="section">
-      <h2>Envoi</h2>
-      <div>
-        <label for="av-mail">Destinataires</label>
-        <input type="text" id="av-mail" placeholder="mail1@..., mail2@..." value="mathieu.bonhomme@fctp.fr">
-      </div>
-    </section>
-
   </section>
 
 </main>
@@ -273,21 +232,18 @@
 <div class="actions" data-actions="rapport">
   <button type="button" class="btn btn-secondary" id="btnReset" title="Réinitialiser">🗑️</button>
   <button type="button" class="btn btn-share" id="btnShare" title="Partager (SMS/WhatsApp/mail)">📤 Partager</button>
-  <button type="button" class="btn btn-primary" id="btnSend">PDF & mail</button>
 </div>
 
 <div class="actions hidden" data-actions="pointage">
   <button type="button" class="btn btn-secondary" id="pt-reset" title="Réinitialiser">🗑️</button>
   <button type="button" class="btn btn-neutral" id="pt-xlsx">Excel</button>
-  <button type="button" class="btn btn-share" id="pt-share" title="Partager (SMS/WhatsApp/mail)">📤</button>
-  <button type="button" class="btn btn-primary" id="pt-pdf">PDF & mail</button>
+  <button type="button" class="btn btn-share" id="pt-share" title="Partager (SMS/WhatsApp/mail)">📤 Partager</button>
 </div>
 
 <div class="actions hidden" data-actions="avancement">
   <button type="button" class="btn btn-secondary" id="av-reset" title="Réinitialiser">🗑️</button>
   <button type="button" class="btn btn-neutral" id="av-xlsx">Excel</button>
-  <button type="button" class="btn btn-share" id="av-share" title="Partager (SMS/WhatsApp/mail)">📤</button>
-  <button type="button" class="btn btn-primary" id="av-pdf">PDF & mail</button>
+  <button type="button" class="btn btn-share" id="av-share" title="Partager (SMS/WhatsApp/mail)">📤 Partager</button>
 </div>
 
 <div id="toast" class="toast"></div>

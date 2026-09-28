@@ -141,6 +141,15 @@ textarea { resize: vertical; min-height: 80px; }
 }
 .btn-add:hover { background: rgba(249, 115, 22, 0.05); }
 
+.btn-row { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.btn-row .btn-add { margin-top: 0; flex: 1 1 220px; }
+.btn-add-lmc {
+  color: #1e293b !important;
+  border-color: #1e293b !important;
+  background: rgba(30, 41, 59, 0.04) !important;
+}
+.btn-add-lmc:hover { background: rgba(30, 41, 59, 0.1) !important; }
+
 .weather-btns {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
