@@ -26,6 +26,23 @@ const formatHM = (h) => {
   return `${H}h${String(M).padStart(2, '0')}`;
 };
 
+const sharePDF = async (doc, fileName, title, text) => {
+  try {
+    const blob = doc.output('blob');
+    const file = new File([blob], fileName, { type: 'application/pdf' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title, text });
+      toast('Rapport partagé', 'success');
+      return;
+    }
+  } catch (err) {
+    if (err && err.name === 'AbortError') { toast('Partage annulé'); return; }
+    console.warn('share failed', err);
+  }
+  doc.save(fileName);
+  toast('Partage indisponible — PDF téléchargé', 'success');
+};
+
 const LOGO_SVG_DATAURL = () => {
   return new Promise((res) => {
     fetch('logo.svg').then(r => r.text()).then((svg) => {
@@ -510,6 +527,21 @@ $('btnSend').addEventListener('click', async () => {
   } catch (err) { console.error(err); toast('Erreur lors de la génération du PDF', 'error'); }
 });
 
+$('btnShare').addEventListener('click', async () => {
+  const data = collectData();
+  if (!data.chantier || !data.date) { toast('Renseigne au minimum le chantier et la date', 'error'); return; }
+  toast('Génération du PDF...');
+  try {
+    const doc = await buildPDF(data);
+    const dateStr = data.date || new Date().toISOString().slice(0, 10);
+    const cleanChantier = (data.chantier || 'chantier').replace(/[^a-zA-Z0-9_-]+/g, '_').slice(0, 40);
+    const fileName = `Rapport_${cleanChantier}_${dateStr}.pdf`;
+    const title = `Rapport ${data.chantier} — ${formatDateFR(data.date)}`;
+    const text = `Rapport journalier ${data.chantier} du ${formatDateFR(data.date)}${data.jour ? ' (jour n°' + data.jour + ')' : ''}.`;
+    await sharePDF(doc, fileName, title, text);
+  } catch (err) { console.error(err); toast('Erreur PDF', 'error'); }
+});
+
 $('btnReset').addEventListener('click', () => {
   if (!confirm('Effacer toutes les données saisies ?')) return;
   localStorage.removeItem(STORAGE_KEY);
@@ -689,6 +721,22 @@ const buildPointagePDF = async (d) => {
   doc.text('Pointage — généré le ' + new Date().toLocaleString('fr-FR'), M, H - 6);
   return doc;
 };
+
+$('pt-share').addEventListener('click', async () => {
+  const d = collectPointage();
+  if (!d.compagnons.length) { toast('Aucun compagnon saisi', 'error'); return; }
+  toast('Génération du PDF...');
+  try {
+    const doc = await buildPointagePDF(d);
+    const chan = (d.chantier || 'chantier').replace(/[^a-zA-Z0-9_-]+/g, '_').slice(0, 30);
+    const dt = d.date || new Date().toISOString().slice(0, 10);
+    const fileName = `Pointage_${chan}_${dt}.pdf`;
+    const totalH = formatHM(d.compagnons.reduce((s, c) => s + c.heures, 0));
+    const title = `Pointage ${d.chantier} — ${formatDateFR(d.date)}`;
+    const text = `Pointage ${d.chantier} du ${formatDateFR(d.date)} : ${d.compagnons.length} compagnons, ${totalH}.`;
+    await sharePDF(doc, fileName, title, text);
+  } catch (err) { console.error(err); toast('Erreur PDF', 'error'); }
+});
 
 $('pt-pdf').addEventListener('click', async () => {
   const d = collectPointage();
@@ -926,6 +974,21 @@ const buildAvancementPDF = async (d) => {
   doc.text('Avancement — généré le ' + new Date().toLocaleString('fr-FR'), M, H - 6);
   return doc;
 };
+
+$('av-share').addEventListener('click', async () => {
+  const d = collectAvancement();
+  if (!d.taches.length) { toast('Aucune tâche saisie', 'error'); return; }
+  toast('Génération du PDF...');
+  try {
+    const doc = await buildAvancementPDF(d);
+    const chan = (d.chantier || 'chantier').replace(/[^a-zA-Z0-9_-]+/g, '_').slice(0, 30);
+    const dt = d.date || new Date().toISOString().slice(0, 10);
+    const fileName = `Avancement_${chan}_${dt}.pdf`;
+    const title = `Avancement ${d.chantier} — ${formatDateFR(d.date)}`;
+    const text = `Suivi avancement ${d.chantier} du ${formatDateFR(d.date)} : ${d.taches.length} tâches suivies.`;
+    await sharePDF(doc, fileName, title, text);
+  } catch (err) { console.error(err); toast('Erreur PDF', 'error'); }
+});
 
 $('av-pdf').addEventListener('click', async () => {
   const d = collectAvancement();
