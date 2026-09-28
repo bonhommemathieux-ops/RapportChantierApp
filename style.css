@@ -284,3 +284,173 @@ textarea { resize: vertical; min-height: 80px; }
   font-size: 11px;
   font-weight: 700;
 }
+
+/* -------- Onglets -------- */
+.tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+  background: var(--white);
+  border-bottom: 1px solid var(--light-gray);
+  position: sticky;
+  top: 80px;
+  z-index: 99;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+}
+.tab-btn {
+  background: transparent;
+  border: none;
+  padding: 12px 4px 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--gray);
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  transition: all 0.15s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.tab-btn .tab-emoji { font-size: 20px; }
+.tab-btn.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+  background: rgba(249, 115, 22, 0.04);
+}
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+.hidden { display: none !important; }
+
+/* -------- Pointage -------- */
+.pointage-row {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr 90px 90px 80px 60px 36px;
+  gap: 6px;
+  align-items: center;
+}
+.pointage-row .p-total {
+  text-align: center;
+  font-weight: 700;
+  color: var(--primary-dark);
+  font-size: 13px;
+}
+@media (max-width: 600px) {
+  .pointage-row {
+    grid-template-columns: 1fr 1fr 36px;
+    grid-template-areas:
+      "nom nom rm"
+      "ent ent ."
+      "arr dep pause"
+      "total total total";
+    gap: 6px;
+  }
+  .pointage-row .p-nom { grid-area: nom; }
+  .pointage-row .p-ent { grid-area: ent; }
+  .pointage-row .p-arr { grid-area: arr; }
+  .pointage-row .p-dep { grid-area: dep; }
+  .pointage-row .p-pause { grid-area: pause; }
+  .pointage-row .p-total { grid-area: total; padding: 4px; background: rgba(249,115,22,0.08); border-radius: 6px; }
+  .pointage-row .btn-remove { grid-area: rm; }
+}
+
+.totals {
+  background: var(--dark);
+  color: var(--white);
+  border-radius: 10px;
+  padding: 12px 16px;
+  display: flex;
+  gap: 20px;
+  justify-content: space-around;
+}
+.total-line {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.total-line span {
+  font-size: 11px;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.total-line strong {
+  font-size: 22px;
+  color: var(--primary);
+  font-weight: 800;
+}
+
+/* -------- Avancement -------- */
+.av-row {
+  display: grid;
+  grid-template-columns: 1.6fr 1.2fr 1fr 70px 70px 60px 36px;
+  gap: 6px;
+  align-items: center;
+}
+@media (max-width: 600px) {
+  .av-row {
+    grid-template-columns: 1fr 1fr 36px;
+    grid-template-areas:
+      "rue rue rm"
+      "tache tache ."
+      "statut statut ."
+      "prev real unit";
+    gap: 6px;
+  }
+  .av-row .a-rue { grid-area: rue; }
+  .av-row .a-tache { grid-area: tache; }
+  .av-row .a-statut { grid-area: statut; }
+  .av-row .a-prev { grid-area: prev; }
+  .av-row .a-real { grid-area: real; }
+  .av-row .a-unit { grid-area: unit; }
+  .av-row .btn-remove { grid-area: rm; }
+}
+
+.recap-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.recap-item {
+  background: var(--bg);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.recap-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--dark);
+  margin-bottom: 6px;
+}
+.recap-bar {
+  height: 8px;
+  background: var(--light-gray);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.recap-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary), var(--primary-dark));
+  transition: width 0.3s;
+}
+.recap-nums {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--gray);
+  display: flex;
+  justify-content: space-between;
+}
+.recap-pct {
+  font-weight: 700;
+  color: var(--primary-dark);
+}
+
+/* -------- Bouton neutre (Excel) -------- */
+.btn-neutral {
+  background: var(--dark);
+  color: var(--white);
+}
+.btn-neutral:hover { background: #0f172a; }
+.btn-neutral:active { transform: translateY(1px); }
