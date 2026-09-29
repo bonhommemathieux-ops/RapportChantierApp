@@ -19,200 +19,76 @@
   <img src="logo.svg" alt="Logo">
   <div>
     <h1>Chantier FCTP</h1>
-    <div class="subtitle">Rapport • Pointage • Avancement</div>
+    <div class="subtitle">Rapport & avancement</div>
   </div>
 </header>
 
-<nav class="tabs">
-  <button type="button" class="tab-btn active" data-tab="rapport"><span class="tab-emoji">📋</span>Rapport</button>
-  <button type="button" class="tab-btn" data-tab="pointage"><span class="tab-emoji">⏱️</span>Pointage</button>
-  <button type="button" class="tab-btn" data-tab="avancement"><span class="tab-emoji">🚧</span>Avancement</button>
-</nav>
-
 <main>
-
-  <!-- ============================================================ -->
-  <!-- ONGLET RAPPORT                                                -->
-  <!-- ============================================================ -->
-  <section id="tab-rapport" class="tab-panel active">
-    <form id="form">
-
-      <section class="section">
-        <h2>Informations générales</h2>
-        <div class="grid-2">
-          <div>
-            <label for="date">Date</label>
-            <input type="date" id="date" required>
-          </div>
-          <div>
-            <label for="jour">Jour n°</label>
-            <input type="number" id="jour" min="1" placeholder="Ex : 12">
-          </div>
-        </div>
-        <div class="grid" style="margin-top:12px">
-          <div>
-            <label for="chantier">Nom du chantier</label>
-            <input type="text" id="chantier" placeholder="Ex : MATABIAU Secteur 3" required>
-          </div>
-          <div>
-            <label for="localisation">Localisation / Rue</label>
-            <input type="text" id="localisation" placeholder="Ex : Rue Jean Aicart">
-          </div>
-          <div>
-            <label for="redacteur">Rédigé par</label>
-            <input type="text" id="redacteur" placeholder="Ex : Mathieu Bonhomme">
-          </div>
-        </div>
-      </section>
-
-      <section class="section">
-        <h2>Météo</h2>
-        <div class="weather-btns" id="meteoBtns">
-          <button type="button" class="weather-btn" data-val="Ensoleillé"><span class="emoji">☀️</span>Ensoleillé</button>
-          <button type="button" class="weather-btn" data-val="Nuageux"><span class="emoji">⛅</span>Nuageux</button>
-          <button type="button" class="weather-btn" data-val="Pluvieux"><span class="emoji">🌧️</span>Pluvieux</button>
-          <button type="button" class="weather-btn" data-val="Orageux"><span class="emoji">⛈️</span>Orageux</button>
-          <button type="button" class="weather-btn" data-val="Neigeux"><span class="emoji">❄️</span>Neige</button>
-          <button type="button" class="weather-btn" data-val="Venteux"><span class="emoji">💨</span>Vent</button>
-          <button type="button" class="weather-btn" data-val="Brouillard"><span class="emoji">🌫️</span>Brouillard</button>
-          <button type="button" class="weather-btn" data-val="Forte chaleur"><span class="emoji">🔥</span>Canicule</button>
-        </div>
-        <div class="grid-2" style="margin-top:12px">
-          <div>
-            <label for="tempMin">T° min (°C)</label>
-            <input type="number" id="tempMin" placeholder="Ex : 12">
-          </div>
-          <div>
-            <label for="tempMax">T° max (°C)</label>
-            <input type="number" id="tempMax" placeholder="Ex : 24">
-          </div>
-        </div>
-        <div style="margin-top:12px">
-          <label for="meteoObs">Impact sur les travaux (arrêts, ralentissements)</label>
-          <textarea id="meteoObs" rows="2" placeholder="Ex : Arrêt du bétonnage entre 14h et 16h à cause de la pluie"></textarea>
-        </div>
-      </section>
-
-      <section class="section">
-        <h2>Matériel & livraisons</h2>
-        <div class="header-row">
-          <label style="margin:0">Engins présents sur site</label>
-        </div>
-        <div id="engins" class="row-list"></div>
-        <button type="button" class="btn-add" data-add="engin">+ Ajouter un engin</button>
-
-        <div class="header-row" style="margin-top:18px">
-          <label style="margin:0">Livraisons du jour</label>
-        </div>
-        <div id="livraisons" class="row-list"></div>
-        <button type="button" class="btn-add" data-add="livraison">+ Ajouter une livraison</button>
-      </section>
-
-      <section class="section">
-        <h2>Sécurité & incidents</h2>
-        <div>
-          <label for="secObs">Observations sécurité / 1/4 h sécurité</label>
-          <textarea id="secObs" rows="2" placeholder="Ex : Rappel port des EPI, sujet du jour : circulation piétons"></textarea>
-        </div>
-        <div style="margin-top:12px">
-          <label for="incidents">Incidents / accidents / presque-accidents</label>
-          <textarea id="incidents" rows="2" placeholder="Aucun / Décris l'incident, mesures prises"></textarea>
-        </div>
-        <div style="margin-top:12px">
-          <label for="visiteurs">Visiteurs / contrôles (MOE, MOA, CSPS, coordonnateur...)</label>
-          <textarea id="visiteurs" rows="2" placeholder="Ex : Visite MOE 10h — validation phasage semaine"></textarea>
-        </div>
-      </section>
-
-      <section class="section">
-        <h2>Observations & remarques</h2>
-        <div>
-          <label for="obsGen">Points de blocage, difficultés, décisions à valider</label>
-          <textarea id="obsGen" rows="3" placeholder="Ex : Attente confirmation MOE sur DN 200 rue X"></textarea>
-        </div>
-        <div style="margin-top:12px">
-          <label for="prevu">Programme prévu pour le lendemain</label>
-          <textarea id="prevu" rows="2" placeholder="Ex : Suite terrassement + pose PE DN 200"></textarea>
-        </div>
-      </section>
-
-      <section class="section">
-        <h2>Photos du chantier</h2>
-        <label class="photo-upload">
-          <input type="file" id="photoInput" accept="image/*" multiple capture="environment">
-          <div class="photo-upload-label">📷 Ajouter des photos (multi-sélection possible)</div>
-          <div class="hint" style="margin-top:6px">Les photos sont compressées et intégrées au PDF</div>
-        </label>
-        <div id="photoGrid" class="photo-grid"></div>
-      </section>
-
-    </form>
-  </section>
-
-  <!-- ============================================================ -->
-  <!-- ONGLET POINTAGE                                               -->
-  <!-- ============================================================ -->
-  <section id="tab-pointage" class="tab-panel">
+  <form id="form">
 
     <section class="section">
-      <h2>Journée</h2>
-      <div class="grid-2">
+      <h2>Informations générales</h2>
+      <div class="grid">
         <div>
-          <label for="pt-date">Date</label>
-          <input type="date" id="pt-date" required>
+          <label for="date">Date</label>
+          <input type="date" id="date" required>
         </div>
         <div>
-          <label for="pt-chantier">Chantier</label>
-          <input type="text" id="pt-chantier" placeholder="Ex : MATABIAU S3">
+          <label for="chantier">Nom du chantier</label>
+          <input type="text" id="chantier" placeholder="Ex : MATABIAU Secteur 3" required>
         </div>
+        <div>
+          <label for="localisation">Localisation / Rue</label>
+          <input type="text" id="localisation" placeholder="Ex : Rue Jean Aicart">
+        </div>
+        <div>
+          <label for="redacteur">Rédigé par</label>
+          <input type="text" id="redacteur" placeholder="Ex : Mathieu Bonhomme">
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Météo</h2>
+      <div class="weather-btns" id="meteoBtns">
+        <button type="button" class="weather-btn" data-val="Ensoleillé"><span class="emoji">☀️</span>Ensoleillé</button>
+        <button type="button" class="weather-btn" data-val="Nuageux"><span class="emoji">⛅</span>Nuageux</button>
+        <button type="button" class="weather-btn" data-val="Pluvieux"><span class="emoji">🌧️</span>Pluvieux</button>
+        <button type="button" class="weather-btn" data-val="Orageux"><span class="emoji">⛈️</span>Orageux</button>
+        <button type="button" class="weather-btn" data-val="Neigeux"><span class="emoji">❄️</span>Neige</button>
+        <button type="button" class="weather-btn" data-val="Venteux"><span class="emoji">💨</span>Vent</button>
+        <button type="button" class="weather-btn" data-val="Brouillard"><span class="emoji">🌫️</span>Brouillard</button>
+        <button type="button" class="weather-btn" data-val="Forte chaleur"><span class="emoji">🔥</span>Canicule</button>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Matériel présent sur site</h2>
+      <div id="engins" class="row-list"></div>
+      <button type="button" class="btn-add" data-add="engin">+ Ajouter un engin</button>
+    </section>
+
+    <section class="section">
+      <h2>Sécurité & incidents</h2>
+      <div>
+        <label for="secObs">Observations sécurité / 1/4 h sécurité</label>
+        <textarea id="secObs" rows="2" placeholder="Ex : Rappel port des EPI, sujet du jour : circulation piétons"></textarea>
       </div>
       <div style="margin-top:12px">
-        <label for="pt-chef">Chef de chantier</label>
-        <input type="text" id="pt-chef" placeholder="Ex : Mathieu Bonhomme">
+        <label for="incidents">Incidents / accidents / presque-accidents</label>
+        <textarea id="incidents" rows="2" placeholder="Aucun / Décris l'incident, mesures prises"></textarea>
+      </div>
+      <div style="margin-top:12px">
+        <label for="visiteurs">Visiteurs / contrôles (MOE, MOA, CSPS...)</label>
+        <textarea id="visiteurs" rows="2" placeholder="Ex : Visite MOE 10h — validation phasage semaine"></textarea>
       </div>
     </section>
 
     <section class="section">
-      <h2>Compagnons</h2>
-      <div id="pt-compagnons" class="row-list"></div>
-      <div class="btn-row">
-        <button type="button" class="btn-add" id="pt-add">+ Ajouter un compagnon</button>
-        <button type="button" class="btn-add btn-add-lmc" id="pt-load-lmc">👷 Charger équipe LMC (9 pers.)</button>
-      </div>
-      <p class="hint">Renseigne arrivée, départ, pause déjeuner (en minutes). Le total est calculé automatiquement.</p>
-
-      <div class="totals" id="pt-totals" style="margin-top:14px">
-        <div class="total-line"><span>Effectif</span><strong id="pt-total-nb">0</strong></div>
-        <div class="total-line"><span>Total heures</span><strong id="pt-total-h">0h00</strong></div>
-      </div>
-    </section>
-
-  </section>
-
-  <!-- ============================================================ -->
-  <!-- ONGLET AVANCEMENT                                             -->
-  <!-- ============================================================ -->
-  <section id="tab-avancement" class="tab-panel">
-
-    <section class="section">
-      <h2>Chantier suivi</h2>
-      <div class="grid-2">
-        <div>
-          <label for="av-date">Date de mise à jour</label>
-          <input type="date" id="av-date" required>
-        </div>
-        <div>
-          <label for="av-chantier">Chantier</label>
-          <input type="text" id="av-chantier" placeholder="Ex : MATABIAU S3">
-        </div>
-      </div>
-    </section>
-
-    <section class="section">
-      <h2>Tâches par rue / tronçon</h2>
+      <h2>Avancement — tâches par rue / tronçon</h2>
       <div id="av-taches" class="row-list"></div>
       <button type="button" class="btn-add" id="av-add">+ Ajouter une tâche</button>
-      <p class="hint">Coche la case "Fait" quand la tâche est terminée. Saisis les quantités prévues et réalisées.</p>
+      <p class="hint">Statut : ⚪ À faire / 🟠 En cours / 🟢 Terminé. Qté prévue / réalisée facultatives.</p>
     </section>
 
     <section class="section">
@@ -222,28 +98,13 @@
       </div>
     </section>
 
-  </section>
-
+  </form>
 </main>
 
-<!-- ============================================================ -->
-<!-- BARRES D'ACTION                                               -->
-<!-- ============================================================ -->
-<div class="actions" data-actions="rapport">
+<div class="actions">
   <button type="button" class="btn btn-secondary" id="btnReset" title="Réinitialiser">🗑️</button>
+  <button type="button" class="btn btn-neutral" id="btnXlsx">Excel</button>
   <button type="button" class="btn btn-share" id="btnShare" title="Partager (SMS/WhatsApp/mail)">📤 Partager</button>
-</div>
-
-<div class="actions hidden" data-actions="pointage">
-  <button type="button" class="btn btn-secondary" id="pt-reset" title="Réinitialiser">🗑️</button>
-  <button type="button" class="btn btn-neutral" id="pt-xlsx">Excel</button>
-  <button type="button" class="btn btn-share" id="pt-share" title="Partager (SMS/WhatsApp/mail)">📤 Partager</button>
-</div>
-
-<div class="actions hidden" data-actions="avancement">
-  <button type="button" class="btn btn-secondary" id="av-reset" title="Réinitialiser">🗑️</button>
-  <button type="button" class="btn btn-neutral" id="av-xlsx">Excel</button>
-  <button type="button" class="btn btn-share" id="av-share" title="Partager (SMS/WhatsApp/mail)">📤 Partager</button>
 </div>
 
 <div id="toast" class="toast"></div>
