@@ -71,6 +71,7 @@ const COMPAGNONS = [
   'KHAN Musaa',
   'KOCHAI Tayyab',
   'KONE Adama (My Job intérim)',
+  'VIALES Cédric (My Job intérim)',
   'WALIZADA Wahidullah',
 ];
 
