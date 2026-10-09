@@ -31,21 +31,18 @@ const updateDateFr = () => {
   el.textContent = iso ? '📅 ' + formatDateFRLong(iso) : '';
 };
 
-const sharePDF = async (doc, fileName, title, text) => {
+const shareFiles = async (files, title, text) => {
   try {
-    const blob = doc.output('blob');
-    const file = new File([blob], fileName, { type: 'application/pdf' });
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({ files: [file], title, text });
-      toast('Rapport partagé', 'success');
-      return;
+    if (navigator.canShare && navigator.canShare({ files })) {
+      await navigator.share({ files, title, text });
+      toast('Rapport partagé (PDF + Excel)', 'success');
+      return true;
     }
   } catch (err) {
-    if (err && err.name === 'AbortError') { toast('Partage annulé'); return; }
+    if (err && err.name === 'AbortError') { toast('Partage annulé'); return true; }
     console.warn('share failed', err);
   }
-  doc.save(fileName);
-  toast('Partage indisponible — PDF téléchargé', 'success');
+  return false;
 };
 
 const LOGO_PNG_DATAURL = () => new Promise((res) => {
@@ -690,57 +687,80 @@ const buildPDF = async (d) => {
 $('btnShare').addEventListener('click', async () => {
   const d = collectData();
   if (!d.chantier || !d.date) { toast('Renseigne au minimum le chantier et la date', 'error'); return; }
-  toast('Génération du PDF...');
+  toast('Génération du rapport...');
   try {
-    const doc = await buildPDF(d);
     const dateStr = d.date || new Date().toISOString().slice(0, 10);
     const cleanChantier = (d.chantier || 'chantier').replace(/[^a-zA-Z0-9_-]+/g, '_').slice(0, 40);
-    const fileName = `Rapport_${cleanChantier}_${dateStr}.pdf`;
+    const pdfName = `Rapport_${cleanChantier}_${dateStr}.pdf`;
+    const xlsName = `Rapport_${cleanChantier}_${dateStr}.xlsx`;
+
+    const doc = await buildPDF(d);
+    const pdfBlob = doc.output('blob');
+    const pdfFile = new File([pdfBlob], pdfName, { type: 'application/pdf' });
+
+    const files = [pdfFile];
+    try {
+      const xlsBlob = buildXLSXBlob(d);
+      if (xlsBlob) files.push(new File([xlsBlob], xlsName, {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      }));
+    } catch (e) { console.warn('XLSX skip', e); }
+
     const title = `Rapport ${d.chantier} — ${formatDateFR(d.date)}`;
     const text = `Rapport chantier ${d.chantier} du ${formatDateFR(d.date)}.`;
-    await sharePDF(doc, fileName, title, text);
-  } catch (err) { console.error(err); toast('Erreur PDF', 'error'); }
+
+    const ok = await shareFiles(files, title, text);
+    if (!ok) {
+      // Fallback : telechargement local des 2 fichiers
+      doc.save(pdfName);
+      if (files.length > 1) {
+        const url = URL.createObjectURL(files[1]);
+        const a = document.createElement('a');
+        a.href = url; a.download = xlsName;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+      toast('Partage indisponible — PDF + Excel téléchargés', 'success');
+    }
+  } catch (err) { console.error(err); toast('Erreur génération', 'error'); }
 });
 
-$('btnXlsx').addEventListener('click', () => {
-  const d = collectData();
-  if (!d.taches.length && !(d.equipes && d.equipes.length)) {
-    toast('Aucune tâche ni pointage saisi', 'error'); return;
-  }
-  const detail = [
-    ['SUIVI AVANCEMENT'],
-    ['Chantier', d.chantier, 'Date', formatDateFR(d.date)],
-    [],
-    ['Rue / tronçon', 'Tâche', 'Statut', 'Qté prévue', 'Qté réalisée', 'Unité', 'Avancement %'],
-    ...d.taches.map(t => {
-      const pct = parseFloat(t.prev) ? Math.round((parseFloat(t.real) || 0) / parseFloat(t.prev) * 100) : 0;
-      const statutLabel = (STATUTS.find(s => s.val === t.statut) || {}).label || '';
-      return [t.rue, t.tache, statutLabel, parseFloat(t.prev) || 0, parseFloat(t.real) || 0, t.unit, pct + '%'];
-    }),
-  ];
-  const wsDetail = XLSX.utils.aoa_to_sheet(detail);
-  wsDetail['!cols'] = [{ wch: 24 }, { wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 8 }, { wch: 14 }];
-
-  const byTache = {};
-  d.taches.forEach(t => {
-    const key = `${t.tache}|${t.unit}`;
-    if (!byTache[key]) byTache[key] = { tache: t.tache, unit: t.unit, prev: 0, real: 0 };
-    byTache[key].prev += parseFloat(t.prev) || 0;
-    byTache[key].real += parseFloat(t.real) || 0;
-  });
-  const recapRows = [
-    ['RÉCAP PAR TÂCHE'], [],
-    ['Tâche', 'Unité', 'Qté prévue', 'Qté réalisée', 'Avancement %'],
-    ...Object.values(byTache).map(v => [
-      v.tache, v.unit, +v.prev.toFixed(2), +v.real.toFixed(2),
-      (v.prev ? Math.round(v.real / v.prev * 100) : 0) + '%',
-    ]),
-  ];
-  const wsRecap = XLSX.utils.aoa_to_sheet(recapRows);
-  wsRecap['!cols'] = [{ wch: 22 }, { wch: 8 }, { wch: 14 }, { wch: 14 }, { wch: 14 }];
-
+const buildXLSXWorkbook = (d) => {
   const wb = XLSX.utils.book_new();
-  if (d.taches.length) {
+
+  if (d.taches && d.taches.length) {
+    const detail = [
+      ['SUIVI AVANCEMENT'],
+      ['Chantier', d.chantier, 'Date', formatDateFR(d.date)],
+      [],
+      ['Rue / tronçon', 'Tâche', 'Statut', 'Qté prévue', 'Qté réalisée', 'Unité', 'Avancement %'],
+      ...d.taches.map(t => {
+        const pct = parseFloat(t.prev) ? Math.round((parseFloat(t.real) || 0) / parseFloat(t.prev) * 100) : 0;
+        const statutLabel = (STATUTS.find(s => s.val === t.statut) || {}).label || '';
+        return [t.rue, t.tache, statutLabel, parseFloat(t.prev) || 0, parseFloat(t.real) || 0, t.unit, pct + '%'];
+      }),
+    ];
+    const wsDetail = XLSX.utils.aoa_to_sheet(detail);
+    wsDetail['!cols'] = [{ wch: 24 }, { wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 8 }, { wch: 14 }];
+
+    const byTache = {};
+    d.taches.forEach(t => {
+      const key = `${t.tache}|${t.unit}`;
+      if (!byTache[key]) byTache[key] = { tache: t.tache, unit: t.unit, prev: 0, real: 0 };
+      byTache[key].prev += parseFloat(t.prev) || 0;
+      byTache[key].real += parseFloat(t.real) || 0;
+    });
+    const recapRows = [
+      ['RÉCAP PAR TÂCHE'], [],
+      ['Tâche', 'Unité', 'Qté prévue', 'Qté réalisée', 'Avancement %'],
+      ...Object.values(byTache).map(v => [
+        v.tache, v.unit, +v.prev.toFixed(2), +v.real.toFixed(2),
+        (v.prev ? Math.round(v.real / v.prev * 100) : 0) + '%',
+      ]),
+    ];
+    const wsRecap = XLSX.utils.aoa_to_sheet(recapRows);
+    wsRecap['!cols'] = [{ wch: 22 }, { wch: 8 }, { wch: 14 }, { wch: 14 }, { wch: 14 }];
+
     XLSX.utils.book_append_sheet(wb, wsDetail, 'Détail');
     XLSX.utils.book_append_sheet(wb, wsRecap, 'Récap');
   }
@@ -768,7 +788,6 @@ $('btnXlsx').addEventListener('click', () => {
     wsPtg['!cols'] = [{ wch: 22 }, { wch: 22 }, { wch: 30 }, { wch: 10 }];
     XLSX.utils.book_append_sheet(wb, wsPtg, 'Pointage');
 
-    // Onglet Matériel par équipe/front
     const matRows = [
       ['MATÉRIEL PAR FRONT'],
       ['Chantier', d.chantier, 'Date', formatDateFR(d.date)],
@@ -784,7 +803,6 @@ $('btnXlsx').addEventListener('click', () => {
     wsMat['!cols'] = [{ wch: 22 }, { wch: 22 }, { wch: 28 }, { wch: 22 }, { wch: 10 }];
     XLSX.utils.book_append_sheet(wb, wsMat, 'Matériel');
 
-    // Onglet Récap heures par conducteur
     const totalByCond = {};
     d.equipes.forEach(eq => (eq.engins || []).forEach(e => {
       if (!e.conducteur) return;
@@ -815,10 +833,25 @@ $('btnXlsx').addEventListener('click', () => {
       XLSX.utils.book_append_sheet(wb, wsCond, 'Conducteurs');
     }
   }
+  return wb;
+};
 
+const buildXLSXBlob = (d) => {
+  const wb = buildXLSXWorkbook(d);
+  if (!wb.SheetNames || !wb.SheetNames.length) return null;
+  const u8 = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+  return new Blob([u8], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+};
+
+$('btnXlsx').addEventListener('click', () => {
+  const d = collectData();
+  if (!d.taches.length && !(d.equipes && d.equipes.length)) {
+    toast('Aucune tâche ni pointage saisi', 'error'); return;
+  }
+  const wb = buildXLSXWorkbook(d);
   const chan = (d.chantier || 'chantier').replace(/[^a-zA-Z0-9_-]+/g, '_').slice(0, 30);
   const dt = d.date || new Date().toISOString().slice(0, 10);
-  XLSX.writeFile(wb, `Avancement_${chan}_${dt}.xlsx`);
+  XLSX.writeFile(wb, `Rapport_${chan}_${dt}.xlsx`);
   toast('Fichier Excel téléchargé', 'success');
 });
 

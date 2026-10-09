@@ -1,4 +1,4 @@
-const CACHE = 'rjc-v27';
+const CACHE = 'rjc-v28';
 const ASSETS = ['./', './index.html', './style.css', './app.js', './logo.png', './icon-192.png', './icon-512.png', './manifest.json'];
 
 self.addEventListener('install', (e) => {
