@@ -65,6 +65,7 @@ const COMPAGNONS = [
   'AHMADZAI Khalid (conducteur)',
   'AHMADZAI Ishfaq',
   'AHMADZAI Janzeeb',
+  'BENONI Charli (Adecco intérim)',
   'BEYAZIT Hiyasettin',
   'FAQIRI Esmatullah',
   'HAZARBOZ Wahab (conducteur)',
