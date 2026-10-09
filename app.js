@@ -16,6 +16,21 @@ const formatDateFR = (iso) => {
   return `${d}/${m}/${y}`;
 };
 
+const formatDateFRLong = (iso) => {
+  if (!iso) return '';
+  try {
+    const dt = new Date(iso + 'T12:00:00');
+    return dt.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  } catch { return formatDateFR(iso); }
+};
+
+const updateDateFr = () => {
+  const el = document.getElementById('dateFr');
+  if (!el) return;
+  const iso = document.getElementById('date').value;
+  el.textContent = iso ? '📅 ' + formatDateFRLong(iso) : '';
+};
+
 const sharePDF = async (doc, fileName, title, text) => {
   try {
     const blob = doc.output('blob');
@@ -369,10 +384,11 @@ const restore = () => {
   } catch (e) { console.warn('restore fail', e); }
 };
 
-$('form').addEventListener('input', () => { updateRecap(); persist(); });
-$('form').addEventListener('change', () => { updateRecap(); persist(); });
+$('form').addEventListener('input', () => { updateRecap(); updateDateFr(); persist(); });
+$('form').addEventListener('change', () => { updateRecap(); updateDateFr(); persist(); });
 
 restore();
+updateDateFr();
 
 // =============================================================================
 // PDF (rapport + avancement combinés)

@@ -109,6 +109,14 @@ input:focus, select:focus, textarea:focus {
 }
 textarea { resize: vertical; min-height: 80px; }
 
+.date-fr {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--gray);
+  font-style: italic;
+  min-height: 14px;
+}
+
 .row-list { display: flex; flex-direction: column; gap: 8px; }
 .row-item {
   display: grid;
