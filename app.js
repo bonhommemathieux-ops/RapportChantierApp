@@ -102,6 +102,37 @@ const FRONTS_S3 = [
 ];
 const ALL_FRONTS = [...FRONTS_S2, ...FRONTS_S3];
 
+const MATERIEL = {
+  'Terrassement': [
+    'Pelle 5T', 'Pelle 8T', 'Pelle 10T', 'Pelle 12T', 'Pelle 15T', 'Pelle 20T',
+    'Mini-pelle 1.5T', 'Mini-pelle 2.5T',
+    'BRH (brise-roche hydraulique)', 'Marteau piqueur',
+    'Chargeuse',
+  ],
+  'Transport': [
+    'Camion 8x4', 'Camion 6x4', 'Camion 4x2', 'Camion benne', 'Camion-grue', 'Polybenne',
+    'Dumper (tombereau)', 'Fourgon utilitaire', 'Semi-remorque',
+  ],
+  'Compactage': [
+    'Compacteur monocylindre', 'Compacteur tandem', 'Plaque vibrante', 'Pilonneuse',
+  ],
+  'Enrobé / Finitions': [
+    'Finisseur', 'Rouleau tandem', 'Mini-finisseur',
+  ],
+  'Divers': [
+    'Groupe électrogène', 'Nacelle', 'Carotteuse', 'Scie à sol',
+    'Pompe à eau / Pompe immergée', 'Compresseur',
+  ],
+};
+const ALL_MATERIEL = Object.values(MATERIEL).flat();
+
+const buildMaterielOptions = () =>
+  '<option value="">— Choisir un engin —</option>' +
+  Object.entries(MATERIEL).map(([groupe, items]) =>
+    `<optgroup label="${groupe}">${items.map(m => `<option value="${m}">${m}</option>`).join('')}</optgroup>`
+  ).join('') +
+  '<option value="__autre__">+ Autre (saisie libre)</option>';
+
 const COMPAGNONS = [
   'AHMADZAI Khalid (conducteur)',
   'AHMADZAI Ishfaq',
@@ -262,14 +293,40 @@ const addEquipe = (data = {}) => {
 const addEnginToEquipe = (eqBlock, data = {}) => {
   const wrap = document.createElement('div');
   wrap.innerHTML = `
-    <div class="row-item">
-      <input type="text" class="f-nom" placeholder="Ex : Pelle 8T, camion benne" />
+    <div class="row-item engin-row">
+      <select class="f-select">${buildMaterielOptions()}</select>
+      <input type="text" class="f-nom" placeholder="Nom libre" style="display:none" />
       <input type="text" class="f-heures" placeholder="Heures" />
       <button type="button" class="btn-remove" data-remove>✕</button>
     </div>`.trim();
   const row = wrap.firstChild;
-  if (data.nom) row.querySelector('.f-nom').value = data.nom;
+  const sel = row.querySelector('.f-select');
+  const libre = row.querySelector('.f-nom');
+
+  if (data.nom) {
+    if (ALL_MATERIEL.includes(data.nom)) {
+      sel.value = data.nom;
+      libre.value = data.nom;
+    } else {
+      sel.value = '__autre__';
+      libre.style.display = '';
+      libre.value = data.nom;
+    }
+  }
   if (data.heures) row.querySelector('.f-heures').value = data.heures;
+
+  sel.addEventListener('change', () => {
+    if (sel.value === '__autre__') {
+      libre.style.display = '';
+      libre.value = '';
+      libre.focus();
+    } else {
+      libre.style.display = 'none';
+      libre.value = sel.value;
+    }
+    persist();
+  });
+
   eqBlock.querySelector('.engins').appendChild(row);
 };
 
@@ -361,10 +418,13 @@ const collectEquipes = () => [...document.querySelectorAll('#equipes .equipe-blo
       const nom = (sel === '__autre__') ? libre : sel;
       return { nom, heures: r.querySelector('.m-heures').value };
     }).filter(m => m.nom),
-    engins: [...eq.querySelectorAll('.engins .row-item')].map(r => ({
-      nom: r.querySelector('.f-nom').value.trim(),
-      heures: r.querySelector('.f-heures').value.trim(),
-    })).filter(e => e.nom),
+    engins: [...eq.querySelectorAll('.engins .row-item')].map(r => {
+      const sel = r.querySelector('.f-select');
+      const libre = r.querySelector('.f-nom');
+      const selVal = sel && sel.value && sel.value !== '__autre__' ? sel.value : '';
+      const nom = selVal || (libre ? libre.value.trim() : '');
+      return { nom, heures: r.querySelector('.f-heures').value.trim() };
+    }).filter(e => e.nom),
     taches: [...eq.querySelectorAll('.av-row')].map(r => ({
       tache: r.querySelector('.a-tache').value,
       statut: r.querySelector('.a-statut').value,

@@ -192,6 +192,10 @@ textarea { resize: vertical; min-height: 80px; }
 .membre-row .m-libre { font-style: italic; }
 .membre-row .m-heures { text-align: center; }
 .equipe-block .btn-add { margin-top: 8px; font-size: 12px; padding: 6px 10px; }
+.engin-row {
+  grid-template-columns: 1.3fr 1fr 90px 40px;
+}
+.engin-row .f-nom { font-style: italic; }
 .equipe-front {
   display: grid;
   grid-template-columns: auto 1fr;
