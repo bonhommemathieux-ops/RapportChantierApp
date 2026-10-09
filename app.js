@@ -124,9 +124,26 @@ const equipeTemplate = () => `
       <input type="text" class="eq-nom" placeholder="Nom de l'équipe (ex: Équipe VRD, Soudure...)" />
       <button type="button" class="btn-remove" data-remove-equipe title="Supprimer l'équipe">✕</button>
     </div>
+    <div class="equipe-front">
+      <label>🚧 Affectée au front :</label>
+      <select class="eq-front"><option value="">— aucun front —</option></select>
+    </div>
     <div class="membres row-list"></div>
     <button type="button" class="btn-add btn-add-membre">+ Ajouter un membre</button>
   </div>`;
+
+const getFronts = () => [...document.querySelectorAll('#av-rues .r-nom')]
+  .map(el => el.value.trim()).filter(Boolean);
+
+const refreshFrontSelects = () => {
+  const fronts = getFronts();
+  document.querySelectorAll('.eq-front').forEach(sel => {
+    const current = sel.value;
+    sel.innerHTML = '<option value="">— aucun front —</option>' +
+      fronts.map(f => `<option value="${f}">${f}</option>`).join('');
+    if (fronts.includes(current)) sel.value = current;
+  });
+};
 
 const addMembre = (equipeEl, data = {}) => {
   const wrap = document.createElement('div');
@@ -165,6 +182,11 @@ const addEquipe = (data = {}) => {
   const block = wrap.firstChild;
   if (data.nom) block.querySelector('.eq-nom').value = data.nom;
   $('equipes').appendChild(block);
+  refreshFrontSelects();
+  if (data.front) {
+    const sel = block.querySelector('.eq-front');
+    if ([...sel.options].some(o => o.value === data.front)) sel.value = data.front;
+  }
   (data.membres && data.membres.length ? data.membres : [{}]).forEach(m => addMembre(block, m));
 
   block.querySelector('.btn-add-membre').addEventListener('click', () => {
@@ -271,11 +293,12 @@ const addRue = (data = {}) => {
     if (!confirm("Supprimer ce front (rue + matériel + tâches) ?")) return;
     block.remove();
     updateRecap();
+    refreshFrontSelects();
     persist();
   });
 };
 
-$('av-add-rue').addEventListener('click', () => { addRue(); updateRecap(); persist(); });
+$('av-add-rue').addEventListener('click', () => { addRue(); updateRecap(); refreshFrontSelects(); persist(); });
 
 document.addEventListener('click', (e) => {
   if (!e.target.matches('[data-remove]')) return;
@@ -314,6 +337,7 @@ const updateRecap = () => {
 // =============================================================================
 const collectEquipes = () => [...document.querySelectorAll('#equipes .equipe-block')].map(eq => ({
   nom: eq.querySelector('.eq-nom').value.trim(),
+  front: eq.querySelector('.eq-front').value || '',
   membres: [...eq.querySelectorAll('.membre-row')].map(r => {
     const sel = r.querySelector('.m-nom').value;
     const libre = r.querySelector('.m-libre').value.trim();
@@ -377,8 +401,6 @@ const restore = () => {
       const btn = document.querySelector(`.weather-btn[data-val="${d.meteo}"]`);
       if (btn) { btn.classList.add('active'); state.meteo = d.meteo; }
     }
-    $('equipes').innerHTML = '';
-    (d.equipes && d.equipes.length ? d.equipes : [{}]).forEach(addEquipe);
     $('av-rues').innerHTML = '';
     let ruesArr = [];
     if (d.rues && d.rues.length) {
@@ -396,12 +418,26 @@ const restore = () => {
       if (d.engins && d.engins.length && ruesArr[0]) ruesArr[0].engins = d.engins;
     }
     (ruesArr.length ? ruesArr : [{}]).forEach(addRue);
+    // Les equipes doivent etre instanciees APRES les rues pour que les selects .eq-front soient peuples
+    $('equipes').innerHTML = '';
+    (d.equipes && d.equipes.length ? d.equipes : [{}]).forEach(addEquipe);
+    refreshFrontSelects();
     updateRecap();
   } catch (e) { console.warn('restore fail', e); }
 };
 
-$('form').addEventListener('input', () => { updateRecap(); updateDateFr(); persist(); });
-$('form').addEventListener('change', () => { updateRecap(); updateDateFr(); persist(); });
+$('form').addEventListener('input', (e) => {
+  updateRecap();
+  updateDateFr();
+  if (e.target.matches('.r-nom')) refreshFrontSelects();
+  persist();
+});
+$('form').addEventListener('change', (e) => {
+  updateRecap();
+  updateDateFr();
+  if (e.target.matches('.r-nom')) refreshFrontSelects();
+  persist();
+});
 
 restore();
 updateDateFr();
@@ -471,7 +507,8 @@ const buildPDF = async (d) => {
       if (y > H - 30) { doc.addPage(); y = M; }
       const totalH = eq.membres.reduce((s, m) => s + (parseFloat(m.heures) || 0), 0);
       doc.setFont('helvetica', 'bold').setFontSize(10).setTextColor(30, 41, 59);
-      doc.text(`${eq.nom || 'Équipe sans nom'}  —  ${eq.membres.length} personne(s)  —  ${totalH.toFixed(2)} h total`, M, y);
+      const frontTxt = eq.front ? `  →  Front : ${eq.front}` : '';
+      doc.text(`${eq.nom || 'Équipe sans nom'}${frontTxt}  —  ${eq.membres.length} personne(s)  —  ${totalH.toFixed(2)} h total`, M, y);
       y += 3;
       doc.autoTable({
         startY: y,
@@ -628,7 +665,7 @@ $('btnXlsx').addEventListener('click', () => {
       ['POINTAGE ÉQUIPES'],
       ['Chantier', d.chantier, 'Date', formatDateFR(d.date)],
       [],
-      ['Équipe', 'Nom', 'Heures'],
+      ['Équipe', 'Front', 'Nom', 'Heures'],
     ];
     let grandTotal = 0;
     d.equipes.forEach(eq => {
@@ -636,14 +673,14 @@ $('btnXlsx').addEventListener('click', () => {
       eq.membres.forEach(m => {
         const h = parseFloat(m.heures) || 0;
         totalEq += h; grandTotal += h;
-        ptgRows.push([eq.nom || '(sans nom)', m.nom, h]);
+        ptgRows.push([eq.nom || '(sans nom)', eq.front || '', m.nom, h]);
       });
-      ptgRows.push(['', `Total ${eq.nom || ''}`, totalEq]);
+      ptgRows.push(['', '', `Total ${eq.nom || ''}`, totalEq]);
       ptgRows.push([]);
     });
-    ptgRows.push(['', 'TOTAL GÉNÉRAL', grandTotal]);
+    ptgRows.push(['', '', 'TOTAL GÉNÉRAL', grandTotal]);
     const wsPtg = XLSX.utils.aoa_to_sheet(ptgRows);
-    wsPtg['!cols'] = [{ wch: 22 }, { wch: 30 }, { wch: 10 }];
+    wsPtg['!cols'] = [{ wch: 22 }, { wch: 22 }, { wch: 30 }, { wch: 10 }];
     XLSX.utils.book_append_sheet(wb, wsPtg, 'Pointage');
   }
 

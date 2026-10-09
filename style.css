@@ -192,6 +192,19 @@ textarea { resize: vertical; min-height: 80px; }
 .membre-row .m-libre { font-style: italic; }
 .membre-row .m-heures { text-align: center; }
 .equipe-block .btn-add { margin-top: 8px; font-size: 12px; padding: 6px 10px; }
+.equipe-front {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+  padding: 6px 8px;
+  background: #fff;
+  border: 1px dashed var(--light-gray);
+  border-radius: 6px;
+}
+.equipe-front label { font-size: 12px; color: var(--gray); font-weight: 600; }
+.equipe-front select { padding: 6px 8px; font-size: 13px; }
 
 /* ===== Avancement par rue ===== */
 .rue-block {
