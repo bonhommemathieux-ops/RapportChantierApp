@@ -213,6 +213,15 @@ textarea { resize: vertical; min-height: 80px; }
   font-size: 14px;
 }
 .rue-block .btn-add { margin-top: 8px; font-size: 12px; padding: 6px 10px; }
+.sub-head {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gray);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 14px 0 6px 0;
+}
+.sub-head:first-of-type { margin-top: 4px; }
 
 .weather-btns {
   display: grid;

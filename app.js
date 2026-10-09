@@ -92,26 +92,8 @@ const COMPAGNONS = [
 ];
 
 // =============================================================================
-// ENGINS (matériel)
+// METEO
 // =============================================================================
-const enginTemplate = () => `
-  <div class="row-item">
-    <input type="text" class="f-nom" placeholder="Ex : Pelle 8T, camion benne" />
-    <input type="text" class="f-heures" placeholder="Heures" />
-    <button type="button" class="btn-remove" data-remove>✕</button>
-  </div>`;
-
-const addEngin = (data = {}) => {
-  const wrap = document.createElement('div');
-  wrap.innerHTML = enginTemplate().trim();
-  const row = wrap.firstChild;
-  if (data.nom) row.querySelector('.f-nom').value = data.nom;
-  if (data.heures) row.querySelector('.f-heures').value = data.heures;
-  $('engins').appendChild(row);
-};
-
-document.querySelector('[data-add="engin"]').addEventListener('click', () => { addEngin(); persist(); });
-
 document.querySelectorAll('.weather-btn').forEach((btn) => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.weather-btn').forEach((b) => b.classList.remove('active'));
@@ -225,15 +207,35 @@ const tacheTemplate = () => `
     <button type="button" class="btn-remove" data-remove>✕</button>
   </div>`;
 
+const enginTemplate = () => `
+  <div class="row-item">
+    <input type="text" class="f-nom" placeholder="Ex : Pelle 8T, camion benne" />
+    <input type="text" class="f-heures" placeholder="Heures" />
+    <button type="button" class="btn-remove" data-remove>✕</button>
+  </div>`;
+
 const rueTemplate = () => `
   <div class="rue-block" data-rue>
     <div class="rue-head">
       <input type="text" class="r-nom" placeholder="Rue / tronçon (ex: Rue Turin, Imp. Guisot...)" />
       <button type="button" class="btn-remove" data-remove-rue title="Supprimer la rue">✕</button>
     </div>
+    <div class="sub-head">🚜 Matériel sur ce front</div>
+    <div class="engins row-list"></div>
+    <button type="button" class="btn-add btn-add-engin">+ Ajouter un engin</button>
+    <div class="sub-head">🚧 Tâches</div>
     <div class="taches row-list"></div>
     <button type="button" class="btn-add btn-add-tache">+ Ajouter une tâche</button>
   </div>`;
+
+const addEnginToRue = (rueEl, data = {}) => {
+  const wrap = document.createElement('div');
+  wrap.innerHTML = enginTemplate().trim();
+  const row = wrap.firstChild;
+  if (data.nom) row.querySelector('.f-nom').value = data.nom;
+  if (data.heures) row.querySelector('.f-heures').value = data.heures;
+  rueEl.querySelector('.engins').appendChild(row);
+};
 
 const addTacheToRue = (rueEl, data = {}) => {
   const wrap = document.createElement('div');
@@ -253,15 +255,20 @@ const addRue = (data = {}) => {
   const block = wrap.firstChild;
   if (data.nom) block.querySelector('.r-nom').value = data.nom;
   $('av-rues').appendChild(block);
+  (data.engins && data.engins.length ? data.engins : [{}]).forEach(e => addEnginToRue(block, e));
   (data.taches && data.taches.length ? data.taches : [{}]).forEach(t => addTacheToRue(block, t));
 
+  block.querySelector('.btn-add-engin').addEventListener('click', () => {
+    addEnginToRue(block);
+    persist();
+  });
   block.querySelector('.btn-add-tache').addEventListener('click', () => {
     addTacheToRue(block);
     updateRecap();
     persist();
   });
   block.querySelector('[data-remove-rue]').addEventListener('click', () => {
-    if (!confirm("Supprimer cette rue et ses tâches ?")) return;
+    if (!confirm("Supprimer ce front (rue + matériel + tâches) ?")) return;
     block.remove();
     updateRecap();
     persist();
@@ -305,11 +312,6 @@ const updateRecap = () => {
 // =============================================================================
 // COLLECT / PERSIST / RESTORE
 // =============================================================================
-const collectEngins = () => [...document.querySelectorAll('#engins .row-item')].map(r => ({
-  nom: r.querySelector('.f-nom').value.trim(),
-  heures: r.querySelector('.f-heures').value.trim(),
-})).filter(e => e.nom);
-
 const collectEquipes = () => [...document.querySelectorAll('#equipes .equipe-block')].map(eq => ({
   nom: eq.querySelector('.eq-nom').value.trim(),
   membres: [...eq.querySelectorAll('.membre-row')].map(r => {
@@ -320,35 +322,44 @@ const collectEquipes = () => [...document.querySelectorAll('#equipes .equipe-blo
   }).filter(m => m.nom),
 })).filter(e => e.nom || e.membres.length);
 
+const collectRues = () => [...document.querySelectorAll('#av-rues .rue-block')].map(block => ({
+  nom: block.querySelector('.r-nom').value.trim(),
+  engins: [...block.querySelectorAll('.engins .row-item')].map(r => ({
+    nom: r.querySelector('.f-nom').value.trim(),
+    heures: r.querySelector('.f-heures').value.trim(),
+  })).filter(e => e.nom),
+  taches: [...block.querySelectorAll('.av-row')].map(r => ({
+    tache: r.querySelector('.a-tache').value,
+    statut: r.querySelector('.a-statut').value,
+    prev: r.querySelector('.a-prev').value,
+    real: r.querySelector('.a-real').value,
+    unit: r.querySelector('.a-unit').value,
+  })),
+})).filter(r => r.nom);
+
 const collectTaches = () => {
+  // Vue aplatie des taches avec nom de rue (pour recap + PDF/Excel)
   const out = [];
-  document.querySelectorAll('#av-rues .rue-block').forEach(block => {
-    const rue = block.querySelector('.r-nom').value.trim();
-    if (!rue) return;
-    block.querySelectorAll('.av-row').forEach(r => {
-      out.push({
-        rue,
-        tache: r.querySelector('.a-tache').value,
-        statut: r.querySelector('.a-statut').value,
-        prev: r.querySelector('.a-prev').value,
-        real: r.querySelector('.a-real').value,
-        unit: r.querySelector('.a-unit').value,
-      });
-    });
+  collectRues().forEach(r => {
+    r.taches.forEach(t => out.push({ rue: r.nom, ...t }));
   });
   return out;
 };
 
-const collectData = () => ({
-  date: $('date').value,
-  chantier: $('chantier').value.trim(),
-  localisation: $('localisation').value.trim(),
-  redacteur: $('redacteur').value.trim(),
-  meteo: state.meteo,
-  engins: collectEngins(),
-  equipes: collectEquipes(),
-  taches: collectTaches(),
-});
+const collectData = () => {
+  const rues = collectRues();
+  return {
+    date: $('date').value,
+    chantier: $('chantier').value.trim(),
+    localisation: $('localisation').value.trim(),
+    redacteur: $('redacteur').value.trim(),
+    meteo: state.meteo,
+    equipes: collectEquipes(),
+    rues,
+    // vue aplatie pour compat recap
+    taches: rues.flatMap(r => r.taches.map(t => ({ rue: r.nom, ...t }))),
+  };
+};
 
 const persist = () => {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(collectData())); } catch (e) {}
@@ -366,19 +377,24 @@ const restore = () => {
       const btn = document.querySelector(`.weather-btn[data-val="${d.meteo}"]`);
       if (btn) { btn.classList.add('active'); state.meteo = d.meteo; }
     }
-    $('engins').innerHTML = '';
-    (d.engins && d.engins.length ? d.engins : [{}]).forEach(addEngin);
     $('equipes').innerHTML = '';
     (d.equipes && d.equipes.length ? d.equipes : [{}]).forEach(addEquipe);
-    // Grouper les taches par rue pour restaurer dans la nouvelle structure
     $('av-rues').innerHTML = '';
-    const rues = {};
-    (d.taches || []).forEach(t => {
-      const key = t.rue || '(sans rue)';
-      if (!rues[key]) rues[key] = [];
-      rues[key].push(t);
-    });
-    const ruesArr = Object.entries(rues).map(([nom, taches]) => ({ nom, taches }));
+    let ruesArr = [];
+    if (d.rues && d.rues.length) {
+      ruesArr = d.rues;
+    } else if (d.taches && d.taches.length) {
+      // Compat ancien format : grouper les taches par rue
+      const grouped = {};
+      d.taches.forEach(t => {
+        const key = t.rue || '(sans rue)';
+        if (!grouped[key]) grouped[key] = { nom: key, engins: [], taches: [] };
+        grouped[key].taches.push(t);
+      });
+      ruesArr = Object.values(grouped);
+      // Migrer les anciens engins globaux vers la 1ere rue
+      if (d.engins && d.engins.length && ruesArr[0]) ruesArr[0].engins = d.engins;
+    }
     (ruesArr.length ? ruesArr : [{}]).forEach(addRue);
     updateRecap();
   } catch (e) { console.warn('restore fail', e); }
@@ -449,19 +465,6 @@ const buildPDF = async (d) => {
     doc.text(d.meteo, M, y); y += 6;
   }
 
-  if (d.engins.length) {
-    addTitle('Matériel présent');
-    doc.autoTable({
-      startY: y,
-      head: [['Engin / matériel', 'Heures']],
-      body: d.engins.map(e => [e.nom, e.heures]),
-      styles: { fontSize: 9, cellPadding: 2 },
-      headStyles: { fillColor: [30, 41, 59], textColor: 255 },
-      margin: { left: M, right: M },
-    });
-    y = doc.lastAutoTable.finalY + 4;
-  }
-
   if (d.equipes && d.equipes.length) {
     addTitle('Pointage équipes');
     d.equipes.forEach((eq) => {
@@ -483,22 +486,44 @@ const buildPDF = async (d) => {
     });
   }
 
-  if (d.taches.length) {
-    if (y > H - 50) { doc.addPage(); y = M; }
-    addTitle('Avancement — détail');
-    doc.autoTable({
-      startY: y,
-      head: [['Rue / tronçon', 'Tâche', 'Statut', 'Prévu', 'Réalisé', 'Unité', '%']],
-      body: d.taches.map(t => {
-        const pct = parseFloat(t.prev) ? Math.round((parseFloat(t.real) || 0) / parseFloat(t.prev) * 100) : 0;
-        const s = STATUTS.find(x => x.val === t.statut) || STATUTS[0];
-        return [t.rue, t.tache, `${s.emoji} ${s.label}`, t.prev, t.real, t.unit, pct + '%'];
-      }),
-      styles: { fontSize: 8, cellPadding: 1.8 },
-      headStyles: { fillColor: [30, 41, 59], textColor: 255 },
-      margin: { left: M, right: M },
+  if (d.rues && d.rues.length) {
+    addTitle('Fronts — rues / tronçons');
+    d.rues.forEach(rue => {
+      if (y > H - 40) { doc.addPage(); y = M; }
+      doc.setFont('helvetica', 'bold').setFontSize(11).setTextColor(30, 41, 59);
+      doc.text(`▸ ${rue.nom}`, M, y);
+      y += 4;
+      if (rue.engins && rue.engins.length) {
+        doc.autoTable({
+          startY: y,
+          head: [['Matériel', 'Heures']],
+          body: rue.engins.map(e => [e.nom, e.heures || '']),
+          styles: { fontSize: 8, cellPadding: 1.5 },
+          headStyles: { fillColor: [148, 163, 184], textColor: 255 },
+          columnStyles: { 1: { halign: 'center', cellWidth: 25 } },
+          margin: { left: M + 4, right: M },
+        });
+        y = doc.lastAutoTable.finalY + 2;
+      }
+      if (rue.taches && rue.taches.length) {
+        doc.autoTable({
+          startY: y,
+          head: [['Tâche', 'Statut', 'Prévu', 'Réalisé', 'Unité', '%']],
+          body: rue.taches.map(t => {
+            const pct = parseFloat(t.prev) ? Math.round((parseFloat(t.real) || 0) / parseFloat(t.prev) * 100) : 0;
+            const s = STATUTS.find(x => x.val === t.statut) || STATUTS[0];
+            return [t.tache, `${s.emoji} ${s.label}`, t.prev, t.real, t.unit, pct + '%'];
+          }),
+          styles: { fontSize: 8, cellPadding: 1.5 },
+          headStyles: { fillColor: [30, 41, 59], textColor: 255 },
+          margin: { left: M + 4, right: M },
+        });
+        y = doc.lastAutoTable.finalY + 5;
+      } else { y += 2; }
     });
-    y = doc.lastAutoTable.finalY + 6;
+  }
+
+  if (d.taches.length) {
 
     const byTache = {};
     d.taches.forEach(t => {
