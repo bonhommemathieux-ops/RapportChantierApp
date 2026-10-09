@@ -33,21 +33,18 @@ const sharePDF = async (doc, fileName, title, text) => {
   toast('Partage indisponible — PDF téléchargé', 'success');
 };
 
-const LOGO_SVG_DATAURL = () => new Promise((res) => {
-  fetch('logo.svg').then(r => r.text()).then((svg) => {
-    const blob = new Blob([svg], { type: 'image/svg+xml' });
-    const url = URL.createObjectURL(blob);
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = 200; canvas.height = 200;
-      canvas.getContext('2d').drawImage(img, 0, 0, 200, 200);
-      URL.revokeObjectURL(url);
-      res(canvas.toDataURL('image/png'));
-    };
-    img.onerror = () => res(null);
-    img.src = url;
-  }).catch(() => res(null));
+const LOGO_PNG_DATAURL = () => new Promise((res) => {
+  const img = new Image();
+  img.onload = () => {
+    const w = 600;
+    const h = Math.round(w * img.height / img.width);
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+    res({ data: canvas.toDataURL('image/png'), ratio: img.width / img.height });
+  };
+  img.onerror = () => res(null);
+  img.src = 'logo.png';
 });
 
 // =============================================================================
@@ -386,12 +383,18 @@ const buildPDF = async (d) => {
   let y = M;
 
   doc.setFillColor(30, 41, 59).rect(0, 0, W, 28, 'F');
-  const logo = await LOGO_SVG_DATAURL();
-  if (logo) doc.addImage(logo, 'PNG', M, 4, 20, 20);
+  const logo = await LOGO_PNG_DATAURL();
+  let textX = M;
+  if (logo) {
+    const logoH = 16;
+    const logoW = logoH * logo.ratio;
+    doc.addImage(logo.data, 'PNG', M, 6, logoW, logoH);
+    textX = M + logoW + 5;
+  }
   doc.setTextColor(255).setFont('helvetica', 'bold').setFontSize(16);
-  doc.text('RAPPORT CHANTIER FCTP', M + 25, 14);
+  doc.text('RAPPORT CHANTIER', textX, 14);
   doc.setFont('helvetica', 'normal').setFontSize(10);
-  doc.text(d.chantier || '—', M + 25, 21);
+  doc.text(d.chantier || '—', textX, 21);
   doc.setFontSize(9);
   doc.text(formatDateFR(d.date), W - M, 14, { align: 'right' });
 

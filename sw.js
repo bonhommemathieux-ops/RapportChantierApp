@@ -1,5 +1,5 @@
-const CACHE = 'rjc-v14';
-const ASSETS = ['./', './index.html', './style.css', './app.js', './logo.svg', './icon-192.png', './icon-512.png', './manifest.json'];
+const CACHE = 'rjc-v15';
+const ASSETS = ['./', './index.html', './style.css', './app.js', './logo.png', './icon-192.png', './icon-512.png', './manifest.json'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)));
