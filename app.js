@@ -497,7 +497,7 @@ const restore = () => {
     const raw = localStorage.getItem(STORAGE_KEY);
     const d = raw ? JSON.parse(raw) : {};
     $('date').value = d.date || new Date().toISOString().slice(0, 10);
-    $('chantier').value = d.chantier || '';
+    $('chantier').value = d.chantier || 'RCU TOULOUSE MATABIAU SECTEUR 2 - 3';
     $('redacteur').value = d.redacteur || '';
     if (d.meteo) {
       const btn = document.querySelector(`.weather-btn[data-val="${d.meteo}"]`);
