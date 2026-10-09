@@ -332,9 +332,6 @@ const collectData = () => ({
   meteo: state.meteo,
   engins: collectEngins(),
   equipes: collectEquipes(),
-  secObs: $('secObs').value.trim(),
-  incidents: $('incidents').value.trim(),
-  visiteurs: $('visiteurs').value.trim(),
   taches: collectTaches(),
 });
 
@@ -350,9 +347,6 @@ const restore = () => {
     $('chantier').value = d.chantier || '';
     $('localisation').value = d.localisation || '';
     $('redacteur').value = d.redacteur || '';
-    $('secObs').value = d.secObs || '';
-    $('incidents').value = d.incidents || '';
-    $('visiteurs').value = d.visiteurs || '';
     if (d.meteo) {
       const btn = document.querySelector(`.weather-btn[data-val="${d.meteo}"]`);
       if (btn) { btn.classList.add('active'); state.meteo = d.meteo; }
@@ -464,23 +458,6 @@ const buildPDF = async (d) => {
         margin: { left: M, right: M },
       });
       y = doc.lastAutoTable.finalY + 4;
-    });
-  }
-
-  const secBlocks = [
-    ['Observations sécurité', d.secObs],
-    ['Incidents / accidents', d.incidents],
-    ['Visiteurs / contrôles', d.visiteurs],
-  ].filter(b => b[1]);
-  if (secBlocks.length) {
-    addTitle('Sécurité, incidents & visiteurs');
-    secBlocks.forEach(([label, val]) => {
-      if (y > H - 25) { doc.addPage(); y = M; }
-      doc.setFont('helvetica', 'bold').setFontSize(9).setTextColor(100, 116, 139);
-      doc.text(label, M, y); y += 4;
-      doc.setFont('helvetica', 'normal').setTextColor(30, 41, 59);
-      const lines = doc.splitTextToSize(val, W - 2 * M);
-      doc.text(lines, M, y); y += lines.length * 4.5 + 3;
     });
   }
 
