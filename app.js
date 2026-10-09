@@ -70,6 +70,7 @@ const COMPAGNONS = [
   'HAZARBOZ Wahab (conducteur)',
   'KHAN Musaa',
   'KOCHAI Tayyab',
+  'KONE Adama (My Job intérim)',
   'WALIZADA Wahidullah',
 ];
 
