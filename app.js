@@ -198,11 +198,10 @@ document.addEventListener('input', (e) => {
 });
 
 // =============================================================================
-// AVANCEMENT (tâches par rue)
+// AVANCEMENT (rues × tâches)
 // =============================================================================
-const avTemplate = () => `
+const tacheTemplate = () => `
   <div class="row-item av-row">
-    <input type="text" class="a-rue" placeholder="Rue / tronçon" />
     <select class="a-tache">${TACHES.map(t => `<option value="${t}">${t}</option>`).join('')}</select>
     <select class="a-statut">${STATUTS.map(s => `<option value="${s.val}">${s.emoji} ${s.label}</option>`).join('')}</select>
     <input type="number" class="a-prev" placeholder="Prévu" step="any" />
@@ -211,20 +210,50 @@ const avTemplate = () => `
     <button type="button" class="btn-remove" data-remove>✕</button>
   </div>`;
 
-const addTache = (data = {}) => {
+const rueTemplate = () => `
+  <div class="rue-block" data-rue>
+    <div class="rue-head">
+      <input type="text" class="r-nom" placeholder="Rue / tronçon (ex: Rue Turin, Imp. Guisot...)" />
+      <button type="button" class="btn-remove" data-remove-rue title="Supprimer la rue">✕</button>
+    </div>
+    <div class="taches row-list"></div>
+    <button type="button" class="btn-add btn-add-tache">+ Ajouter une tâche</button>
+  </div>`;
+
+const addTacheToRue = (rueEl, data = {}) => {
   const wrap = document.createElement('div');
-  wrap.innerHTML = avTemplate().trim();
+  wrap.innerHTML = tacheTemplate().trim();
   const row = wrap.firstChild;
-  if (data.rue) row.querySelector('.a-rue').value = data.rue;
   if (data.tache) row.querySelector('.a-tache').value = data.tache;
   if (data.statut) row.querySelector('.a-statut').value = data.statut;
   if (data.prev) row.querySelector('.a-prev').value = data.prev;
   if (data.real) row.querySelector('.a-real').value = data.real;
   if (data.unit) row.querySelector('.a-unit').value = data.unit;
-  $('av-taches').appendChild(row);
+  rueEl.querySelector('.taches').appendChild(row);
 };
 
-$('av-add').addEventListener('click', () => { addTache(); updateRecap(); persist(); });
+const addRue = (data = {}) => {
+  const wrap = document.createElement('div');
+  wrap.innerHTML = rueTemplate().trim();
+  const block = wrap.firstChild;
+  if (data.nom) block.querySelector('.r-nom').value = data.nom;
+  $('av-rues').appendChild(block);
+  (data.taches && data.taches.length ? data.taches : [{}]).forEach(t => addTacheToRue(block, t));
+
+  block.querySelector('.btn-add-tache').addEventListener('click', () => {
+    addTacheToRue(block);
+    updateRecap();
+    persist();
+  });
+  block.querySelector('[data-remove-rue]').addEventListener('click', () => {
+    if (!confirm("Supprimer cette rue et ses tâches ?")) return;
+    block.remove();
+    updateRecap();
+    persist();
+  });
+};
+
+$('av-add-rue').addEventListener('click', () => { addRue(); updateRecap(); persist(); });
 
 document.addEventListener('click', (e) => {
   if (!e.target.matches('[data-remove]')) return;
@@ -276,14 +305,24 @@ const collectEquipes = () => [...document.querySelectorAll('#equipes .equipe-blo
   }).filter(m => m.nom),
 })).filter(e => e.nom || e.membres.length);
 
-const collectTaches = () => [...document.querySelectorAll('#av-taches .av-row')].map(r => ({
-  rue: r.querySelector('.a-rue').value.trim(),
-  tache: r.querySelector('.a-tache').value,
-  statut: r.querySelector('.a-statut').value,
-  prev: r.querySelector('.a-prev').value,
-  real: r.querySelector('.a-real').value,
-  unit: r.querySelector('.a-unit').value,
-})).filter(t => t.rue);
+const collectTaches = () => {
+  const out = [];
+  document.querySelectorAll('#av-rues .rue-block').forEach(block => {
+    const rue = block.querySelector('.r-nom').value.trim();
+    if (!rue) return;
+    block.querySelectorAll('.av-row').forEach(r => {
+      out.push({
+        rue,
+        tache: r.querySelector('.a-tache').value,
+        statut: r.querySelector('.a-statut').value,
+        prev: r.querySelector('.a-prev').value,
+        real: r.querySelector('.a-real').value,
+        unit: r.querySelector('.a-unit').value,
+      });
+    });
+  });
+  return out;
+};
 
 const collectData = () => ({
   date: $('date').value,
@@ -322,8 +361,16 @@ const restore = () => {
     (d.engins && d.engins.length ? d.engins : [{}]).forEach(addEngin);
     $('equipes').innerHTML = '';
     (d.equipes && d.equipes.length ? d.equipes : [{}]).forEach(addEquipe);
-    $('av-taches').innerHTML = '';
-    (d.taches && d.taches.length ? d.taches : [{}]).forEach(addTache);
+    // Grouper les taches par rue pour restaurer dans la nouvelle structure
+    $('av-rues').innerHTML = '';
+    const rues = {};
+    (d.taches || []).forEach(t => {
+      const key = t.rue || '(sans rue)';
+      if (!rues[key]) rues[key] = [];
+      rues[key].push(t);
+    });
+    const ruesArr = Object.entries(rues).map(([nom, taches]) => ({ nom, taches }));
+    (ruesArr.length ? ruesArr : [{}]).forEach(addRue);
     updateRecap();
   } catch (e) { console.warn('restore fail', e); }
 };
