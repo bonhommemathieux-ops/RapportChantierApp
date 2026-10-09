@@ -64,6 +64,18 @@ const STATUTS = [
   { val: 'termine', label: 'Terminé', emoji: '🟢' },
 ];
 
+const COMPAGNONS = [
+  'AHMADZAI Khalid (conducteur)',
+  'AHMADZAI Ishfaq',
+  'AHMADZAI Janzeeb',
+  'BEYAZIT Hiyasettin',
+  'FAQIRI Esmatullah',
+  'HAZARBOZ Wahab (conducteur)',
+  'KHAN Musaa',
+  'KOCHAI Tayyab',
+  'WALIZADA Wahidullah',
+];
+
 // =============================================================================
 // ENGINS (matériel)
 // =============================================================================
@@ -92,6 +104,97 @@ document.querySelectorAll('.weather-btn').forEach((btn) => {
     state.meteo = btn.dataset.val;
     persist();
   });
+});
+
+// =============================================================================
+// POINTAGE ÉQUIPES
+// =============================================================================
+const compOptions = () => `<option value=""></option>` +
+  COMPAGNONS.map(n => `<option value="${n}">${n}</option>`).join('') +
+  `<option value="__autre__">+ Autre (saisie libre)</option>`;
+
+const membreTemplate = () => `
+  <div class="row-item membre-row">
+    <select class="m-nom">${compOptions()}</select>
+    <input type="text" class="m-libre" placeholder="Nom libre" style="display:none" />
+    <input type="number" class="m-heures" placeholder="Heures" step="0.25" inputmode="decimal" />
+    <button type="button" class="btn-remove" data-remove>✕</button>
+  </div>`;
+
+const equipeTemplate = () => `
+  <div class="equipe-block" data-equipe>
+    <div class="equipe-head">
+      <input type="text" class="eq-nom" placeholder="Nom de l'équipe (ex: Équipe VRD, Soudure...)" />
+      <button type="button" class="btn-remove" data-remove-equipe title="Supprimer l'équipe">✕</button>
+    </div>
+    <div class="membres row-list"></div>
+    <button type="button" class="btn-add btn-add-membre">+ Ajouter un membre</button>
+  </div>`;
+
+const addMembre = (equipeEl, data = {}) => {
+  const wrap = document.createElement('div');
+  wrap.innerHTML = membreTemplate().trim();
+  const row = wrap.firstChild;
+  const sel = row.querySelector('.m-nom');
+  const libre = row.querySelector('.m-libre');
+  if (data.nom) {
+    if (COMPAGNONS.includes(data.nom)) {
+      sel.value = data.nom;
+    } else {
+      sel.value = '__autre__';
+      libre.style.display = '';
+      libre.value = data.nom;
+    }
+  }
+  if (data.heures) row.querySelector('.m-heures').value = data.heures;
+
+  sel.addEventListener('change', () => {
+    if (sel.value === '__autre__') {
+      libre.style.display = '';
+      libre.focus();
+    } else {
+      libre.style.display = 'none';
+      libre.value = '';
+    }
+    persist();
+  });
+
+  equipeEl.querySelector('.membres').appendChild(row);
+};
+
+const addEquipe = (data = {}) => {
+  const wrap = document.createElement('div');
+  wrap.innerHTML = equipeTemplate().trim();
+  const block = wrap.firstChild;
+  if (data.nom) block.querySelector('.eq-nom').value = data.nom;
+  $('equipes').appendChild(block);
+  (data.membres && data.membres.length ? data.membres : [{}]).forEach(m => addMembre(block, m));
+
+  block.querySelector('.btn-add-membre').addEventListener('click', () => {
+    addMembre(block);
+    persist();
+  });
+  block.querySelector('[data-remove-equipe]').addEventListener('click', () => {
+    if (!confirm("Supprimer cette équipe ?")) return;
+    block.remove();
+    persist();
+  });
+};
+
+$('eq-add').addEventListener('click', () => { addEquipe(); persist(); });
+
+// Auto-remplissage : quand on tape sur les heures du PREMIER membre,
+// recopie la valeur sur les autres membres de la même équipe dont le champ heures est vide.
+document.addEventListener('input', (e) => {
+  if (!e.target.matches('.m-heures')) return;
+  const row = e.target.closest('.membre-row');
+  const membres = row.parentElement.querySelectorAll('.membre-row');
+  if (membres[0] !== row) return;
+  const val = e.target.value;
+  for (let i = 1; i < membres.length; i++) {
+    const h = membres[i].querySelector('.m-heures');
+    if (!h.value) h.value = val;
+  }
 });
 
 // =============================================================================
@@ -163,6 +266,16 @@ const collectEngins = () => [...document.querySelectorAll('#engins .row-item')].
   heures: r.querySelector('.f-heures').value.trim(),
 })).filter(e => e.nom);
 
+const collectEquipes = () => [...document.querySelectorAll('#equipes .equipe-block')].map(eq => ({
+  nom: eq.querySelector('.eq-nom').value.trim(),
+  membres: [...eq.querySelectorAll('.membre-row')].map(r => {
+    const sel = r.querySelector('.m-nom').value;
+    const libre = r.querySelector('.m-libre').value.trim();
+    const nom = (sel === '__autre__') ? libre : sel;
+    return { nom, heures: r.querySelector('.m-heures').value };
+  }).filter(m => m.nom),
+})).filter(e => e.nom || e.membres.length);
+
 const collectTaches = () => [...document.querySelectorAll('#av-taches .av-row')].map(r => ({
   rue: r.querySelector('.a-rue').value.trim(),
   tache: r.querySelector('.a-tache').value,
@@ -179,6 +292,7 @@ const collectData = () => ({
   redacteur: $('redacteur').value.trim(),
   meteo: state.meteo,
   engins: collectEngins(),
+  equipes: collectEquipes(),
   secObs: $('secObs').value.trim(),
   incidents: $('incidents').value.trim(),
   visiteurs: $('visiteurs').value.trim(),
@@ -206,6 +320,8 @@ const restore = () => {
     }
     $('engins').innerHTML = '';
     (d.engins && d.engins.length ? d.engins : [{}]).forEach(addEngin);
+    $('equipes').innerHTML = '';
+    (d.equipes && d.equipes.length ? d.equipes : [{}]).forEach(addEquipe);
     $('av-taches').innerHTML = '';
     (d.taches && d.taches.length ? d.taches : [{}]).forEach(addTache);
     updateRecap();
@@ -281,6 +397,27 @@ const buildPDF = async (d) => {
       margin: { left: M, right: M },
     });
     y = doc.lastAutoTable.finalY + 4;
+  }
+
+  if (d.equipes && d.equipes.length) {
+    addTitle('Pointage équipes');
+    d.equipes.forEach((eq) => {
+      if (y > H - 30) { doc.addPage(); y = M; }
+      const totalH = eq.membres.reduce((s, m) => s + (parseFloat(m.heures) || 0), 0);
+      doc.setFont('helvetica', 'bold').setFontSize(10).setTextColor(30, 41, 59);
+      doc.text(`${eq.nom || 'Équipe sans nom'}  —  ${eq.membres.length} personne(s)  —  ${totalH.toFixed(2)} h total`, M, y);
+      y += 3;
+      doc.autoTable({
+        startY: y,
+        head: [['Nom', 'Heures']],
+        body: eq.membres.map(m => [m.nom, m.heures || '0']),
+        styles: { fontSize: 9, cellPadding: 1.8 },
+        headStyles: { fillColor: [30, 41, 59], textColor: 255 },
+        columnStyles: { 1: { halign: 'center', cellWidth: 25 } },
+        margin: { left: M, right: M },
+      });
+      y = doc.lastAutoTable.finalY + 4;
+    });
   }
 
   const secBlocks = [
@@ -374,7 +511,9 @@ $('btnShare').addEventListener('click', async () => {
 
 $('btnXlsx').addEventListener('click', () => {
   const d = collectData();
-  if (!d.taches.length) { toast('Aucune tâche saisie', 'error'); return; }
+  if (!d.taches.length && !(d.equipes && d.equipes.length)) {
+    toast('Aucune tâche ni pointage saisi', 'error'); return;
+  }
   const detail = [
     ['SUIVI AVANCEMENT'],
     ['Chantier', d.chantier, 'Date', formatDateFR(d.date)],
@@ -408,8 +547,35 @@ $('btnXlsx').addEventListener('click', () => {
   wsRecap['!cols'] = [{ wch: 22 }, { wch: 8 }, { wch: 14 }, { wch: 14 }, { wch: 14 }];
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, wsDetail, 'Détail');
-  XLSX.utils.book_append_sheet(wb, wsRecap, 'Récap');
+  if (d.taches.length) {
+    XLSX.utils.book_append_sheet(wb, wsDetail, 'Détail');
+    XLSX.utils.book_append_sheet(wb, wsRecap, 'Récap');
+  }
+
+  if (d.equipes && d.equipes.length) {
+    const ptgRows = [
+      ['POINTAGE ÉQUIPES'],
+      ['Chantier', d.chantier, 'Date', formatDateFR(d.date)],
+      [],
+      ['Équipe', 'Nom', 'Heures'],
+    ];
+    let grandTotal = 0;
+    d.equipes.forEach(eq => {
+      let totalEq = 0;
+      eq.membres.forEach(m => {
+        const h = parseFloat(m.heures) || 0;
+        totalEq += h; grandTotal += h;
+        ptgRows.push([eq.nom || '(sans nom)', m.nom, h]);
+      });
+      ptgRows.push(['', `Total ${eq.nom || ''}`, totalEq]);
+      ptgRows.push([]);
+    });
+    ptgRows.push(['', 'TOTAL GÉNÉRAL', grandTotal]);
+    const wsPtg = XLSX.utils.aoa_to_sheet(ptgRows);
+    wsPtg['!cols'] = [{ wch: 22 }, { wch: 30 }, { wch: 10 }];
+    XLSX.utils.book_append_sheet(wb, wsPtg, 'Pointage');
+  }
+
   const chan = (d.chantier || 'chantier').replace(/[^a-zA-Z0-9_-]+/g, '_').slice(0, 30);
   const dt = d.date || new Date().toISOString().slice(0, 10);
   XLSX.writeFile(wb, `Avancement_${chan}_${dt}.xlsx`);

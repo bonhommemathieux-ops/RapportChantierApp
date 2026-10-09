@@ -150,6 +150,35 @@ textarea { resize: vertical; min-height: 80px; }
 }
 .btn-add-lmc:hover { background: rgba(30, 41, 59, 0.1) !important; }
 
+/* ===== Pointage equipes ===== */
+.equipe-block {
+  background: #f8fafc;
+  border: 1px solid var(--light-gray);
+  border-left: 4px solid var(--primary);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+.equipe-head {
+  display: grid;
+  grid-template-columns: 1fr 40px;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.equipe-head .eq-nom {
+  font-weight: 600;
+  font-size: 14px;
+}
+.membre-row {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 85px 40px;
+  gap: 6px;
+  align-items: center;
+}
+.membre-row .m-libre { font-style: italic; }
+.membre-row .m-heures { text-align: center; }
+.equipe-block .btn-add { margin-top: 8px; font-size: 12px; padding: 6px 10px; }
+
 .weather-btns {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
