@@ -221,9 +221,15 @@ textarea { resize: vertical; min-height: 80px; }
   gap: 6px;
   margin-bottom: 10px;
 }
-.rue-head .r-nom {
+.rue-head .r-select {
   font-weight: 600;
   font-size: 14px;
+}
+.rue-head .r-nom {
+  grid-column: 1 / -1;
+  font-weight: 600;
+  font-size: 14px;
+  font-style: italic;
 }
 .rue-block .btn-add { margin-top: 8px; font-size: 12px; padding: 6px 10px; }
 .sub-head {

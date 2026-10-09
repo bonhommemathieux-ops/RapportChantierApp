@@ -76,6 +76,32 @@ const STATUTS = [
   { val: 'termine', label: 'Terminé', emoji: '🟢' },
 ];
 
+const FRONTS_S2 = [
+  'S2-01 Rue Montserby',
+  'S2-02 Rue de Périole',
+  'S2-03 Rue Jean Aicard',
+  'S2-04 Avenue Léon Jouhaux',
+  'S2-05 Rue Léon Jouhaux',
+  'S2-06 Rue St Louis - Noémie Dessale - Jolimont',
+  'S2-07 Rue de Jolimont',
+  'S2-08 Avenue Léon Blum',
+];
+const FRONTS_S3 = [
+  'S3-01 Avenue de Lyon',
+  'S3-02 Avenue de Lyon - Rue Chabanon',
+  'S3-03 Rue du Maroc',
+  'S3-04 Avenue de Lavaur - Chemin de Michoun',
+  'S3-05 Rue du Faubourg Bonnefoy',
+  'S3-06 Avenue de Lyon - Pont Matabiau - Bd Bonrepos',
+  'S3-07 Impasse Guisot - Turlan',
+  'S3-08 Rue de Turin',
+  'S3-09 Chemin de Lapujade',
+  'S3-10 Chemin de Lapujade - Rue Michel Ange',
+  'S3-11 Allée Monsonego Sandler',
+  'S3-12 Rue du Maroc - Zone SERNAM',
+];
+const ALL_FRONTS = [...FRONTS_S2, ...FRONTS_S3];
+
 const COMPAGNONS = [
   'AHMADZAI Khalid (conducteur)',
   'AHMADZAI Ishfaq',
@@ -239,7 +265,13 @@ const enginTemplate = () => `
 const rueTemplate = () => `
   <div class="rue-block" data-rue>
     <div class="rue-head">
-      <input type="text" class="r-nom" placeholder="Rue / tronçon (ex: Rue Turin, Imp. Guisot...)" />
+      <select class="r-select">
+        <option value="">— Choisir une rue —</option>
+        <optgroup label="Secteur 2">${FRONTS_S2.map(f => `<option value="${f}">${f}</option>`).join('')}</optgroup>
+        <optgroup label="Secteur 3">${FRONTS_S3.map(f => `<option value="${f}">${f}</option>`).join('')}</optgroup>
+        <option value="__autre__">+ Autre (saisie libre)</option>
+      </select>
+      <input type="text" class="r-nom" placeholder="Rue / tronçon (ex: sous-tronçon spécifique)" style="display:none" />
       <button type="button" class="btn-remove" data-remove-rue title="Supprimer la rue">✕</button>
     </div>
     <div class="sub-head">🚜 Matériel sur ce front</div>
@@ -275,7 +307,36 @@ const addRue = (data = {}) => {
   const wrap = document.createElement('div');
   wrap.innerHTML = rueTemplate().trim();
   const block = wrap.firstChild;
-  if (data.nom) block.querySelector('.r-nom').value = data.nom;
+  const sel = block.querySelector('.r-select');
+  const libre = block.querySelector('.r-nom');
+
+  if (data.nom) {
+    if (ALL_FRONTS.includes(data.nom)) {
+      sel.value = data.nom;
+      libre.style.display = 'none';
+      libre.value = data.nom;
+    } else {
+      sel.value = '__autre__';
+      libre.style.display = '';
+      libre.value = data.nom;
+    }
+  }
+
+  // Quand on change le select, on bascule entre liste et saisie libre
+  sel.addEventListener('change', () => {
+    if (sel.value === '__autre__') {
+      libre.style.display = '';
+      libre.value = '';
+      libre.focus();
+    } else {
+      libre.style.display = 'none';
+      libre.value = sel.value;
+    }
+    refreshFrontSelects();
+    updateRecap();
+    persist();
+  });
+
   $('av-rues').appendChild(block);
   (data.engins && data.engins.length ? data.engins : [{}]).forEach(e => addEnginToRue(block, e));
   (data.taches && data.taches.length ? data.taches : [{}]).forEach(t => addTacheToRue(block, t));
