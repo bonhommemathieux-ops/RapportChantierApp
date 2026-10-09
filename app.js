@@ -144,16 +144,11 @@ const membreTemplate = () => `
     <button type="button" class="btn-remove" data-remove>✕</button>
   </div>`;
 
-const buildFrontOptions = (extras = []) => {
-  const extrasFiltered = extras.filter(e => e && !ALL_FRONTS.includes(e));
-  const extrasHtml = extrasFiltered.length
-    ? `<optgroup label="Sous-tronçons spécifiques">${extrasFiltered.map(f => `<option value="${f}">${f}</option>`).join('')}</optgroup>`
-    : '';
-  return '<option value="">— aucun front —</option>' +
-    `<optgroup label="Secteur 2">${FRONTS_S2.map(f => `<option value="${f}">${f}</option>`).join('')}</optgroup>` +
-    `<optgroup label="Secteur 3">${FRONTS_S3.map(f => `<option value="${f}">${f}</option>`).join('')}</optgroup>` +
-    extrasHtml;
-};
+const buildFrontOptions = () =>
+  '<option value="">— aucun front —</option>' +
+  `<optgroup label="Secteur 2">${FRONTS_S2.map(f => `<option value="${f}">${f}</option>`).join('')}</optgroup>` +
+  `<optgroup label="Secteur 3">${FRONTS_S3.map(f => `<option value="${f}">${f}</option>`).join('')}</optgroup>` +
+  `<option value="__autre__">+ Autre (sous-tronçon spécifique)</option>`;
 
 const equipeTemplate = () => `
   <div class="equipe-block" data-equipe>
@@ -162,29 +157,20 @@ const equipeTemplate = () => `
       <button type="button" class="btn-remove" data-remove-equipe title="Supprimer l'équipe">✕</button>
     </div>
     <div class="equipe-front">
-      <label>🚧 Affectée au front :</label>
+      <label>🚧 Front affecté :</label>
       <select class="eq-front">${buildFrontOptions()}</select>
+      <input type="text" class="eq-front-libre" placeholder="Sous-tronçon (saisie libre)" style="display:none" />
     </div>
+    <div class="sub-head">👷 Membres & heures</div>
     <div class="membres row-list"></div>
     <button type="button" class="btn-add btn-add-membre">+ Ajouter un membre</button>
+    <div class="sub-head">🚜 Matériel sur ce front</div>
+    <div class="engins row-list"></div>
+    <button type="button" class="btn-add btn-add-engin">+ Ajouter un engin</button>
+    <div class="sub-head">🚧 Tâches</div>
+    <div class="taches row-list"></div>
+    <button type="button" class="btn-add btn-add-tache">+ Ajouter une tâche</button>
   </div>`;
-
-const getFronts = () => [...document.querySelectorAll('#av-rues .rue-block')].map(block => {
-  const sel = block.querySelector('.r-select');
-  const libre = block.querySelector('.r-nom');
-  const selVal = sel && sel.value && sel.value !== '__autre__' ? sel.value : '';
-  const libreVal = libre ? libre.value.trim() : '';
-  return selVal || libreVal;
-}).filter(Boolean);
-
-const refreshFrontSelects = () => {
-  const extras = getFronts().filter(f => !ALL_FRONTS.includes(f));
-  document.querySelectorAll('.eq-front').forEach(sel => {
-    const current = sel.value;
-    sel.innerHTML = buildFrontOptions(extras);
-    sel.value = current;
-  });
-};
 
 const addMembre = (equipeEl, data = {}) => {
   const wrap = document.createElement('div');
@@ -222,23 +208,89 @@ const addEquipe = (data = {}) => {
   wrap.innerHTML = equipeTemplate().trim();
   const block = wrap.firstChild;
   if (data.nom) block.querySelector('.eq-nom').value = data.nom;
-  $('equipes').appendChild(block);
-  refreshFrontSelects();
+
+  // Front : si dans la liste, sélectionne. Si pas dedans, "Autre" + saisie libre.
+  const frontSel = block.querySelector('.eq-front');
+  const frontLibre = block.querySelector('.eq-front-libre');
   if (data.front) {
-    const sel = block.querySelector('.eq-front');
-    if ([...sel.options].some(o => o.value === data.front)) sel.value = data.front;
+    if (ALL_FRONTS.includes(data.front)) {
+      frontSel.value = data.front;
+    } else {
+      frontSel.value = '__autre__';
+      frontLibre.style.display = '';
+      frontLibre.value = data.front;
+    }
   }
+  frontSel.addEventListener('change', () => {
+    if (frontSel.value === '__autre__') {
+      frontLibre.style.display = '';
+      frontLibre.focus();
+    } else {
+      frontLibre.style.display = 'none';
+      frontLibre.value = '';
+    }
+    persist();
+  });
+
+  $('equipes').appendChild(block);
+
   (data.membres && data.membres.length ? data.membres : [{}]).forEach(m => addMembre(block, m));
+  (data.engins && data.engins.length ? data.engins : [{}]).forEach(e => addEnginToEquipe(block, e));
+  (data.taches && data.taches.length ? data.taches : [{}]).forEach(t => addTacheToEquipe(block, t));
 
   block.querySelector('.btn-add-membre').addEventListener('click', () => {
     addMembre(block);
     persist();
   });
-  block.querySelector('[data-remove-equipe]').addEventListener('click', () => {
-    if (!confirm("Supprimer cette équipe ?")) return;
-    block.remove();
+  block.querySelector('.btn-add-engin').addEventListener('click', () => {
+    addEnginToEquipe(block);
     persist();
   });
+  block.querySelector('.btn-add-tache').addEventListener('click', () => {
+    addTacheToEquipe(block);
+    updateRecap();
+    persist();
+  });
+  block.querySelector('[data-remove-equipe]').addEventListener('click', () => {
+    if (!confirm("Supprimer cette équipe et tout son contenu (front, membres, matériel, tâches) ?")) return;
+    block.remove();
+    updateRecap();
+    persist();
+  });
+};
+
+const addEnginToEquipe = (eqBlock, data = {}) => {
+  const wrap = document.createElement('div');
+  wrap.innerHTML = `
+    <div class="row-item">
+      <input type="text" class="f-nom" placeholder="Ex : Pelle 8T, camion benne" />
+      <input type="text" class="f-heures" placeholder="Heures" />
+      <button type="button" class="btn-remove" data-remove>✕</button>
+    </div>`.trim();
+  const row = wrap.firstChild;
+  if (data.nom) row.querySelector('.f-nom').value = data.nom;
+  if (data.heures) row.querySelector('.f-heures').value = data.heures;
+  eqBlock.querySelector('.engins').appendChild(row);
+};
+
+const addTacheToEquipe = (eqBlock, data = {}) => {
+  const wrap = document.createElement('div');
+  wrap.innerHTML = `
+    <div class="row-item av-row">
+      <select class="a-tache">${TACHES.map(t => `<option value="${t}">${t}</option>`).join('')}</select>
+      <select class="a-statut">${STATUTS.map(s => `<option value="${s.val}">${s.emoji} ${s.label}</option>`).join('')}</select>
+      <input type="number" class="a-prev" placeholder="Prévu" step="any" />
+      <input type="number" class="a-real" placeholder="Réalisé" step="any" />
+      <select class="a-unit">${UNITES.map(u => `<option value="${u}">${u}</option>`).join('')}</select>
+      <button type="button" class="btn-remove" data-remove>✕</button>
+    </div>`.trim();
+  const row = wrap.firstChild;
+  if (data.tache) row.querySelector('.a-tache').value = data.tache;
+  if (data.statut) row.querySelector('.a-statut').value = data.statut;
+  if (data.prev) row.querySelector('.a-prev').value = data.prev;
+  if (data.real) row.querySelector('.a-real').value = data.real;
+  if (data.unit) row.querySelector('.a-unit').value = data.unit;
+  eqBlock.querySelector('.taches').appendChild(row);
 };
 
 $('eq-add').addEventListener('click', () => { addEquipe(); persist(); });
@@ -257,124 +309,7 @@ document.addEventListener('input', (e) => {
   }
 });
 
-// =============================================================================
-// AVANCEMENT (rues × tâches)
-// =============================================================================
-const tacheTemplate = () => `
-  <div class="row-item av-row">
-    <select class="a-tache">${TACHES.map(t => `<option value="${t}">${t}</option>`).join('')}</select>
-    <select class="a-statut">${STATUTS.map(s => `<option value="${s.val}">${s.emoji} ${s.label}</option>`).join('')}</select>
-    <input type="number" class="a-prev" placeholder="Prévu" step="any" />
-    <input type="number" class="a-real" placeholder="Réalisé" step="any" />
-    <select class="a-unit">${UNITES.map(u => `<option value="${u}">${u}</option>`).join('')}</select>
-    <button type="button" class="btn-remove" data-remove>✕</button>
-  </div>`;
-
-const enginTemplate = () => `
-  <div class="row-item">
-    <input type="text" class="f-nom" placeholder="Ex : Pelle 8T, camion benne" />
-    <input type="text" class="f-heures" placeholder="Heures" />
-    <button type="button" class="btn-remove" data-remove>✕</button>
-  </div>`;
-
-const rueTemplate = () => `
-  <div class="rue-block" data-rue>
-    <div class="rue-head">
-      <select class="r-select">
-        <option value="">— Choisir une rue —</option>
-        <optgroup label="Secteur 2">${FRONTS_S2.map(f => `<option value="${f}">${f}</option>`).join('')}</optgroup>
-        <optgroup label="Secteur 3">${FRONTS_S3.map(f => `<option value="${f}">${f}</option>`).join('')}</optgroup>
-        <option value="__autre__">+ Autre (saisie libre)</option>
-      </select>
-      <input type="text" class="r-nom" placeholder="Rue / tronçon (ex: sous-tronçon spécifique)" style="display:none" />
-      <button type="button" class="btn-remove" data-remove-rue title="Supprimer la rue">✕</button>
-    </div>
-    <div class="sub-head">🚜 Matériel sur ce front</div>
-    <div class="engins row-list"></div>
-    <button type="button" class="btn-add btn-add-engin">+ Ajouter un engin</button>
-    <div class="sub-head">🚧 Tâches</div>
-    <div class="taches row-list"></div>
-    <button type="button" class="btn-add btn-add-tache">+ Ajouter une tâche</button>
-  </div>`;
-
-const addEnginToRue = (rueEl, data = {}) => {
-  const wrap = document.createElement('div');
-  wrap.innerHTML = enginTemplate().trim();
-  const row = wrap.firstChild;
-  if (data.nom) row.querySelector('.f-nom').value = data.nom;
-  if (data.heures) row.querySelector('.f-heures').value = data.heures;
-  rueEl.querySelector('.engins').appendChild(row);
-};
-
-const addTacheToRue = (rueEl, data = {}) => {
-  const wrap = document.createElement('div');
-  wrap.innerHTML = tacheTemplate().trim();
-  const row = wrap.firstChild;
-  if (data.tache) row.querySelector('.a-tache').value = data.tache;
-  if (data.statut) row.querySelector('.a-statut').value = data.statut;
-  if (data.prev) row.querySelector('.a-prev').value = data.prev;
-  if (data.real) row.querySelector('.a-real').value = data.real;
-  if (data.unit) row.querySelector('.a-unit').value = data.unit;
-  rueEl.querySelector('.taches').appendChild(row);
-};
-
-const addRue = (data = {}) => {
-  const wrap = document.createElement('div');
-  wrap.innerHTML = rueTemplate().trim();
-  const block = wrap.firstChild;
-  const sel = block.querySelector('.r-select');
-  const libre = block.querySelector('.r-nom');
-
-  if (data.nom) {
-    if (ALL_FRONTS.includes(data.nom)) {
-      sel.value = data.nom;
-      libre.style.display = 'none';
-      libre.value = data.nom;
-    } else {
-      sel.value = '__autre__';
-      libre.style.display = '';
-      libre.value = data.nom;
-    }
-  }
-
-  // Quand on change le select, on bascule entre liste et saisie libre
-  sel.addEventListener('change', () => {
-    if (sel.value === '__autre__') {
-      libre.style.display = '';
-      libre.value = '';
-      libre.focus();
-    } else {
-      libre.style.display = 'none';
-      libre.value = sel.value;
-    }
-    refreshFrontSelects();
-    updateRecap();
-    persist();
-  });
-
-  $('av-rues').appendChild(block);
-  (data.engins && data.engins.length ? data.engins : [{}]).forEach(e => addEnginToRue(block, e));
-  (data.taches && data.taches.length ? data.taches : [{}]).forEach(t => addTacheToRue(block, t));
-
-  block.querySelector('.btn-add-engin').addEventListener('click', () => {
-    addEnginToRue(block);
-    persist();
-  });
-  block.querySelector('.btn-add-tache').addEventListener('click', () => {
-    addTacheToRue(block);
-    updateRecap();
-    persist();
-  });
-  block.querySelector('[data-remove-rue]').addEventListener('click', () => {
-    if (!confirm("Supprimer ce front (rue + matériel + tâches) ?")) return;
-    block.remove();
-    updateRecap();
-    refreshFrontSelects();
-    persist();
-  });
-};
-
-$('av-add-rue').addEventListener('click', () => { addRue(); updateRecap(); refreshFrontSelects(); persist(); });
+// (Les fonctions matériel/tâches/front sont intégrées dans la section Équipe plus haut)
 
 document.addEventListener('click', (e) => {
   if (!e.target.matches('[data-remove]')) return;
@@ -411,29 +346,26 @@ const updateRecap = () => {
 // =============================================================================
 // COLLECT / PERSIST / RESTORE
 // =============================================================================
-const collectEquipes = () => [...document.querySelectorAll('#equipes .equipe-block')].map(eq => ({
-  nom: eq.querySelector('.eq-nom').value.trim(),
-  front: eq.querySelector('.eq-front').value || '',
-  membres: [...eq.querySelectorAll('.membre-row')].map(r => {
-    const sel = r.querySelector('.m-nom').value;
-    const libre = r.querySelector('.m-libre').value.trim();
-    const nom = (sel === '__autre__') ? libre : sel;
-    return { nom, heures: r.querySelector('.m-heures').value };
-  }).filter(m => m.nom),
-})).filter(e => e.nom || e.membres.length);
-
-const collectRues = () => [...document.querySelectorAll('#av-rues .rue-block')].map(block => {
-  const sel = block.querySelector('.r-select');
-  const libre = block.querySelector('.r-nom');
-  const selVal = sel && sel.value && sel.value !== '__autre__' ? sel.value : '';
-  const nom = selVal || (libre ? libre.value.trim() : '');
+const collectEquipes = () => [...document.querySelectorAll('#equipes .equipe-block')].map(eq => {
+  const frontSel = eq.querySelector('.eq-front');
+  const frontLibre = eq.querySelector('.eq-front-libre');
+  const front = (frontSel.value === '__autre__')
+    ? frontLibre.value.trim()
+    : (frontSel.value || '');
   return {
-    nom,
-    engins: [...block.querySelectorAll('.engins .row-item')].map(r => ({
+    nom: eq.querySelector('.eq-nom').value.trim(),
+    front,
+    membres: [...eq.querySelectorAll('.membre-row')].map(r => {
+      const sel = r.querySelector('.m-nom').value;
+      const libre = r.querySelector('.m-libre').value.trim();
+      const nom = (sel === '__autre__') ? libre : sel;
+      return { nom, heures: r.querySelector('.m-heures').value };
+    }).filter(m => m.nom),
+    engins: [...eq.querySelectorAll('.engins .row-item')].map(r => ({
       nom: r.querySelector('.f-nom').value.trim(),
       heures: r.querySelector('.f-heures').value.trim(),
     })).filter(e => e.nom),
-    taches: [...block.querySelectorAll('.av-row')].map(r => ({
+    taches: [...eq.querySelectorAll('.av-row')].map(r => ({
       tache: r.querySelector('.a-tache').value,
       statut: r.querySelector('.a-statut').value,
       prev: r.querySelector('.a-prev').value,
@@ -441,29 +373,19 @@ const collectRues = () => [...document.querySelectorAll('#av-rues .rue-block')].
       unit: r.querySelector('.a-unit').value,
     })),
   };
-}).filter(r => r.nom);
-
-const collectTaches = () => {
-  // Vue aplatie des taches avec nom de rue (pour recap + PDF/Excel)
-  const out = [];
-  collectRues().forEach(r => {
-    r.taches.forEach(t => out.push({ rue: r.nom, ...t }));
-  });
-  return out;
-};
+}).filter(e => e.nom || e.membres.length || e.taches.length);
 
 const collectData = () => {
-  const rues = collectRues();
+  const equipes = collectEquipes();
   return {
     date: $('date').value,
     chantier: $('chantier').value.trim(),
     localisation: $('localisation').value.trim(),
     redacteur: $('redacteur').value.trim(),
     meteo: state.meteo,
-    equipes: collectEquipes(),
-    rues,
-    // vue aplatie pour compat recap
-    taches: rues.flatMap(r => r.taches.map(t => ({ rue: r.nom, ...t }))),
+    equipes,
+    // Vue aplatie des taches avec front (nom de rue) pour recap global
+    taches: equipes.flatMap(e => e.taches.map(t => ({ rue: e.front || '(sans front)', ...t }))),
   };
 };
 
@@ -483,43 +405,25 @@ const restore = () => {
       const btn = document.querySelector(`.weather-btn[data-val="${d.meteo}"]`);
       if (btn) { btn.classList.add('active'); state.meteo = d.meteo; }
     }
-    $('av-rues').innerHTML = '';
-    let ruesArr = [];
-    if (d.rues && d.rues.length) {
-      ruesArr = d.rues;
-    } else if (d.taches && d.taches.length) {
-      // Compat ancien format : grouper les taches par rue
-      const grouped = {};
-      d.taches.forEach(t => {
-        const key = t.rue || '(sans rue)';
-        if (!grouped[key]) grouped[key] = { nom: key, engins: [], taches: [] };
-        grouped[key].taches.push(t);
-      });
-      ruesArr = Object.values(grouped);
-      // Migrer les anciens engins globaux vers la 1ere rue
-      if (d.engins && d.engins.length && ruesArr[0]) ruesArr[0].engins = d.engins;
+    // Migration ancien format : si pas d.equipes mais d.rues, fusionner tout dans une seule equipe par front
+    let equipesArr = (d.equipes && d.equipes.length) ? d.equipes : [];
+    if (!equipesArr.length && d.rues && d.rues.length) {
+      equipesArr = d.rues.map(r => ({
+        nom: '',
+        front: r.nom,
+        membres: [],
+        engins: r.engins || [],
+        taches: r.taches || [],
+      }));
     }
-    (ruesArr.length ? ruesArr : [{}]).forEach(addRue);
-    // Les equipes doivent etre instanciees APRES les rues pour que les selects .eq-front soient peuples
     $('equipes').innerHTML = '';
-    (d.equipes && d.equipes.length ? d.equipes : [{}]).forEach(addEquipe);
-    refreshFrontSelects();
+    (equipesArr.length ? equipesArr : [{}]).forEach(addEquipe);
     updateRecap();
   } catch (e) { console.warn('restore fail', e); }
 };
 
-$('form').addEventListener('input', (e) => {
-  updateRecap();
-  updateDateFr();
-  if (e.target.matches('.r-nom, .r-select')) refreshFrontSelects();
-  persist();
-});
-$('form').addEventListener('change', (e) => {
-  updateRecap();
-  updateDateFr();
-  if (e.target.matches('.r-nom, .r-select')) refreshFrontSelects();
-  persist();
-});
+$('form').addEventListener('input', () => { updateRecap(); updateDateFr(); persist(); });
+$('form').addEventListener('change', () => { updateRecap(); updateDateFr(); persist(); });
 
 restore();
 updateDateFr();
@@ -584,39 +488,35 @@ const buildPDF = async (d) => {
   }
 
   if (d.equipes && d.equipes.length) {
-    addTitle('Pointage équipes');
+    addTitle('Équipes & chantiers');
     d.equipes.forEach((eq) => {
-      if (y > H - 30) { doc.addPage(); y = M; }
-      const totalH = eq.membres.reduce((s, m) => s + (parseFloat(m.heures) || 0), 0);
-      doc.setFont('helvetica', 'bold').setFontSize(10).setTextColor(30, 41, 59);
-      const frontTxt = eq.front ? `  →  Front : ${eq.front}` : '';
-      doc.text(`${eq.nom || 'Équipe sans nom'}${frontTxt}  —  ${eq.membres.length} personne(s)  —  ${totalH.toFixed(2)} h total`, M, y);
-      y += 3;
-      doc.autoTable({
-        startY: y,
-        head: [['Nom', 'Heures']],
-        body: eq.membres.map(m => [m.nom, m.heures || '0']),
-        styles: { fontSize: 9, cellPadding: 1.8 },
-        headStyles: { fillColor: [30, 41, 59], textColor: 255 },
-        columnStyles: { 1: { halign: 'center', cellWidth: 25 } },
-        margin: { left: M, right: M },
-      });
-      y = doc.lastAutoTable.finalY + 4;
-    });
-  }
-
-  if (d.rues && d.rues.length) {
-    addTitle('Fronts — rues / tronçons');
-    d.rues.forEach(rue => {
       if (y > H - 40) { doc.addPage(); y = M; }
+      const totalH = eq.membres.reduce((s, m) => s + (parseFloat(m.heures) || 0), 0);
+      doc.setFillColor(249, 115, 22).rect(M, y, 2, 5, 'F');
       doc.setFont('helvetica', 'bold').setFontSize(11).setTextColor(30, 41, 59);
-      doc.text(`▸ ${rue.nom}`, M, y);
-      y += 4;
-      if (rue.engins && rue.engins.length) {
+      doc.text(`${eq.nom || 'Équipe sans nom'}${eq.front ? '  →  ' + eq.front : ''}`, M + 4, y + 4);
+      y += 7;
+      doc.setFont('helvetica', 'italic').setFontSize(9).setTextColor(100, 116, 139);
+      doc.text(`${eq.membres.length} personne(s) — ${totalH.toFixed(2)} h total`, M + 4, y);
+      y += 3;
+
+      if (eq.membres.length) {
+        doc.autoTable({
+          startY: y,
+          head: [['Nom', 'Heures']],
+          body: eq.membres.map(m => [m.nom, m.heures || '0']),
+          styles: { fontSize: 8, cellPadding: 1.5 },
+          headStyles: { fillColor: [30, 41, 59], textColor: 255 },
+          columnStyles: { 1: { halign: 'center', cellWidth: 25 } },
+          margin: { left: M + 4, right: M },
+        });
+        y = doc.lastAutoTable.finalY + 2;
+      }
+      if (eq.engins && eq.engins.length) {
         doc.autoTable({
           startY: y,
           head: [['Matériel', 'Heures']],
-          body: rue.engins.map(e => [e.nom, e.heures || '']),
+          body: eq.engins.map(e => [e.nom, e.heures || '']),
           styles: { fontSize: 8, cellPadding: 1.5 },
           headStyles: { fillColor: [148, 163, 184], textColor: 255 },
           columnStyles: { 1: { halign: 'center', cellWidth: 25 } },
@@ -624,11 +524,11 @@ const buildPDF = async (d) => {
         });
         y = doc.lastAutoTable.finalY + 2;
       }
-      if (rue.taches && rue.taches.length) {
+      if (eq.taches && eq.taches.length) {
         doc.autoTable({
           startY: y,
           head: [['Tâche', 'Statut', 'Prévu', 'Réalisé', 'Unité', '%']],
-          body: rue.taches.map(t => {
+          body: eq.taches.map(t => {
             const pct = parseFloat(t.prev) ? Math.round((parseFloat(t.real) || 0) / parseFloat(t.prev) * 100) : 0;
             const s = STATUTS.find(x => x.val === t.statut) || STATUTS[0];
             return [t.tache, `${s.emoji} ${s.label}`, t.prev, t.real, t.unit, pct + '%'];
@@ -638,7 +538,7 @@ const buildPDF = async (d) => {
           margin: { left: M + 4, right: M },
         });
         y = doc.lastAutoTable.finalY + 5;
-      } else { y += 2; }
+      } else { y += 3; }
     });
   }
 
@@ -764,6 +664,22 @@ $('btnXlsx').addEventListener('click', () => {
     const wsPtg = XLSX.utils.aoa_to_sheet(ptgRows);
     wsPtg['!cols'] = [{ wch: 22 }, { wch: 22 }, { wch: 30 }, { wch: 10 }];
     XLSX.utils.book_append_sheet(wb, wsPtg, 'Pointage');
+
+    // Onglet Matériel par équipe/front
+    const matRows = [
+      ['MATÉRIEL PAR FRONT'],
+      ['Chantier', d.chantier, 'Date', formatDateFR(d.date)],
+      [],
+      ['Équipe', 'Front', 'Matériel', 'Heures'],
+    ];
+    d.equipes.forEach(eq => {
+      (eq.engins || []).forEach(e => {
+        matRows.push([eq.nom || '(sans nom)', eq.front || '', e.nom, e.heures || '']);
+      });
+    });
+    const wsMat = XLSX.utils.aoa_to_sheet(matRows);
+    wsMat['!cols'] = [{ wch: 22 }, { wch: 22 }, { wch: 30 }, { wch: 10 }];
+    XLSX.utils.book_append_sheet(wb, wsMat, 'Matériel');
   }
 
   const chan = (d.chantier || 'chantier').replace(/[^a-zA-Z0-9_-]+/g, '_').slice(0, 30);
