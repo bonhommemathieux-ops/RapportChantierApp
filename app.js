@@ -480,7 +480,6 @@ const collectData = () => {
   return {
     date: $('date').value,
     chantier: $('chantier').value.trim(),
-    localisation: $('localisation').value.trim(),
     redacteur: $('redacteur').value.trim(),
     meteo: state.meteo,
     equipes,
@@ -499,7 +498,6 @@ const restore = () => {
     const d = raw ? JSON.parse(raw) : {};
     $('date').value = d.date || new Date().toISOString().slice(0, 10);
     $('chantier').value = d.chantier || '';
-    $('localisation').value = d.localisation || '';
     $('redacteur').value = d.redacteur || '';
     if (d.meteo) {
       const btn = document.querySelector(`.weather-btn[data-val="${d.meteo}"]`);
@@ -567,8 +565,8 @@ const buildPDF = async (d) => {
       3: { cellWidth: 'auto' },
     },
     body: [
-      ['Chantier', d.chantier || '—', 'Rédigé par', d.redacteur || '—'],
-      ['Localisation', d.localisation || '—', 'Date', formatDateFR(d.date) || '—'],
+      ['Chantier', d.chantier || '—', 'Date', formatDateFR(d.date) || '—'],
+      ['Rédigé par', d.redacteur || '—', '', ''],
     ],
   });
   y = doc.lastAutoTable.finalY + 4;
