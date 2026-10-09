@@ -158,8 +158,13 @@ const equipeTemplate = () => `
     <button type="button" class="btn-add btn-add-membre">+ Ajouter un membre</button>
   </div>`;
 
-const getFronts = () => [...document.querySelectorAll('#av-rues .r-nom')]
-  .map(el => el.value.trim()).filter(Boolean);
+const getFronts = () => [...document.querySelectorAll('#av-rues .rue-block')].map(block => {
+  const sel = block.querySelector('.r-select');
+  const libre = block.querySelector('.r-nom');
+  const selVal = sel && sel.value && sel.value !== '__autre__' ? sel.value : '';
+  const libreVal = libre ? libre.value.trim() : '';
+  return selVal || libreVal;
+}).filter(Boolean);
 
 const refreshFrontSelects = () => {
   const fronts = getFronts();
@@ -407,20 +412,26 @@ const collectEquipes = () => [...document.querySelectorAll('#equipes .equipe-blo
   }).filter(m => m.nom),
 })).filter(e => e.nom || e.membres.length);
 
-const collectRues = () => [...document.querySelectorAll('#av-rues .rue-block')].map(block => ({
-  nom: block.querySelector('.r-nom').value.trim(),
-  engins: [...block.querySelectorAll('.engins .row-item')].map(r => ({
-    nom: r.querySelector('.f-nom').value.trim(),
-    heures: r.querySelector('.f-heures').value.trim(),
-  })).filter(e => e.nom),
-  taches: [...block.querySelectorAll('.av-row')].map(r => ({
-    tache: r.querySelector('.a-tache').value,
-    statut: r.querySelector('.a-statut').value,
-    prev: r.querySelector('.a-prev').value,
-    real: r.querySelector('.a-real').value,
-    unit: r.querySelector('.a-unit').value,
-  })),
-})).filter(r => r.nom);
+const collectRues = () => [...document.querySelectorAll('#av-rues .rue-block')].map(block => {
+  const sel = block.querySelector('.r-select');
+  const libre = block.querySelector('.r-nom');
+  const selVal = sel && sel.value && sel.value !== '__autre__' ? sel.value : '';
+  const nom = selVal || (libre ? libre.value.trim() : '');
+  return {
+    nom,
+    engins: [...block.querySelectorAll('.engins .row-item')].map(r => ({
+      nom: r.querySelector('.f-nom').value.trim(),
+      heures: r.querySelector('.f-heures').value.trim(),
+    })).filter(e => e.nom),
+    taches: [...block.querySelectorAll('.av-row')].map(r => ({
+      tache: r.querySelector('.a-tache').value,
+      statut: r.querySelector('.a-statut').value,
+      prev: r.querySelector('.a-prev').value,
+      real: r.querySelector('.a-real').value,
+      unit: r.querySelector('.a-unit').value,
+    })),
+  };
+}).filter(r => r.nom);
 
 const collectTaches = () => {
   // Vue aplatie des taches avec nom de rue (pour recap + PDF/Excel)
@@ -490,13 +501,13 @@ const restore = () => {
 $('form').addEventListener('input', (e) => {
   updateRecap();
   updateDateFr();
-  if (e.target.matches('.r-nom')) refreshFrontSelects();
+  if (e.target.matches('.r-nom, .r-select')) refreshFrontSelects();
   persist();
 });
 $('form').addEventListener('change', (e) => {
   updateRecap();
   updateDateFr();
-  if (e.target.matches('.r-nom')) refreshFrontSelects();
+  if (e.target.matches('.r-nom, .r-select')) refreshFrontSelects();
   persist();
 });
 
