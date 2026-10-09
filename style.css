@@ -193,9 +193,14 @@ textarea { resize: vertical; min-height: 80px; }
 .membre-row .m-heures { text-align: center; }
 .equipe-block .btn-add { margin-top: 8px; font-size: 12px; padding: 6px 10px; }
 .engin-row {
-  grid-template-columns: 1.3fr 1fr 90px 40px;
+  grid-template-columns: 1.2fr 1fr 85px 40px;
+  gap: 6px;
 }
-.engin-row .f-nom { font-style: italic; }
+.engin-row .f-nom,
+.engin-row .f-conducteur-libre { font-style: italic; }
+@media (max-width: 600px) {
+  .engin-row { grid-template-columns: 1fr 1fr 60px 36px; }
+}
 .equipe-front {
   display: grid;
   grid-template-columns: auto 1fr;

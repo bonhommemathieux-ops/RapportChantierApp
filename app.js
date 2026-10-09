@@ -126,6 +126,16 @@ const MATERIEL = {
 };
 const ALL_MATERIEL = Object.values(MATERIEL).flat();
 
+const CONDUCTEURS = [
+  'RUBEN (Lusoloc)',
+  'FERNANDO (Lusoloc)',
+];
+
+const buildConducteurOptions = () =>
+  '<option value="">— aucun —</option>' +
+  CONDUCTEURS.map(c => `<option value="${c}">${c}</option>`).join('') +
+  '<option value="__autre__">+ Autre (saisie libre)</option>';
+
 const buildMaterielOptions = () =>
   '<option value="">— Choisir un engin —</option>' +
   Object.entries(MATERIEL).map(([groupe, items]) =>
@@ -296,12 +306,16 @@ const addEnginToEquipe = (eqBlock, data = {}) => {
     <div class="row-item engin-row">
       <select class="f-select">${buildMaterielOptions()}</select>
       <input type="text" class="f-nom" placeholder="Nom libre" style="display:none" />
+      <select class="f-conducteur" title="Conducteur">${buildConducteurOptions()}</select>
+      <input type="text" class="f-conducteur-libre" placeholder="Conducteur libre" style="display:none" />
       <input type="text" class="f-heures" placeholder="Heures" />
       <button type="button" class="btn-remove" data-remove>✕</button>
     </div>`.trim();
   const row = wrap.firstChild;
   const sel = row.querySelector('.f-select');
   const libre = row.querySelector('.f-nom');
+  const condSel = row.querySelector('.f-conducteur');
+  const condLibre = row.querySelector('.f-conducteur-libre');
 
   if (data.nom) {
     if (ALL_MATERIEL.includes(data.nom)) {
@@ -311,6 +325,15 @@ const addEnginToEquipe = (eqBlock, data = {}) => {
       sel.value = '__autre__';
       libre.style.display = '';
       libre.value = data.nom;
+    }
+  }
+  if (data.conducteur) {
+    if (CONDUCTEURS.includes(data.conducteur)) {
+      condSel.value = data.conducteur;
+    } else {
+      condSel.value = '__autre__';
+      condLibre.style.display = '';
+      condLibre.value = data.conducteur;
     }
   }
   if (data.heures) row.querySelector('.f-heures').value = data.heures;
@@ -323,6 +346,18 @@ const addEnginToEquipe = (eqBlock, data = {}) => {
     } else {
       libre.style.display = 'none';
       libre.value = sel.value;
+    }
+    persist();
+  });
+
+  condSel.addEventListener('change', () => {
+    if (condSel.value === '__autre__') {
+      condLibre.style.display = '';
+      condLibre.value = '';
+      condLibre.focus();
+    } else {
+      condLibre.style.display = 'none';
+      condLibre.value = '';
     }
     persist();
   });
@@ -423,7 +458,15 @@ const collectEquipes = () => [...document.querySelectorAll('#equipes .equipe-blo
       const libre = r.querySelector('.f-nom');
       const selVal = sel && sel.value && sel.value !== '__autre__' ? sel.value : '';
       const nom = selVal || (libre ? libre.value.trim() : '');
-      return { nom, heures: r.querySelector('.f-heures').value.trim() };
+      const condSel = r.querySelector('.f-conducteur');
+      const condLibre = r.querySelector('.f-conducteur-libre');
+      const condVal = condSel && condSel.value && condSel.value !== '__autre__' ? condSel.value : '';
+      const conducteur = condVal || (condLibre ? condLibre.value.trim() : '');
+      return {
+        nom,
+        conducteur,
+        heures: r.querySelector('.f-heures').value.trim(),
+      };
     }).filter(e => e.nom),
     taches: [...eq.querySelectorAll('.av-row')].map(r => ({
       tache: r.querySelector('.a-tache').value,
@@ -575,11 +618,11 @@ const buildPDF = async (d) => {
       if (eq.engins && eq.engins.length) {
         doc.autoTable({
           startY: y,
-          head: [['Matériel', 'Heures']],
-          body: eq.engins.map(e => [e.nom, e.heures || '']),
+          head: [['Matériel', 'Conducteur', 'Heures']],
+          body: eq.engins.map(e => [e.nom, e.conducteur || '—', e.heures || '']),
           styles: { fontSize: 8, cellPadding: 1.5 },
           headStyles: { fillColor: [148, 163, 184], textColor: 255 },
-          columnStyles: { 1: { halign: 'center', cellWidth: 25 } },
+          columnStyles: { 2: { halign: 'center', cellWidth: 20 } },
           margin: { left: M + 4, right: M },
         });
         y = doc.lastAutoTable.finalY + 2;
@@ -730,16 +773,47 @@ $('btnXlsx').addEventListener('click', () => {
       ['MATÉRIEL PAR FRONT'],
       ['Chantier', d.chantier, 'Date', formatDateFR(d.date)],
       [],
-      ['Équipe', 'Front', 'Matériel', 'Heures'],
+      ['Équipe', 'Front', 'Matériel', 'Conducteur', 'Heures'],
     ];
     d.equipes.forEach(eq => {
       (eq.engins || []).forEach(e => {
-        matRows.push([eq.nom || '(sans nom)', eq.front || '', e.nom, e.heures || '']);
+        matRows.push([eq.nom || '(sans nom)', eq.front || '', e.nom, e.conducteur || '', parseFloat(e.heures) || 0]);
       });
     });
     const wsMat = XLSX.utils.aoa_to_sheet(matRows);
-    wsMat['!cols'] = [{ wch: 22 }, { wch: 22 }, { wch: 30 }, { wch: 10 }];
+    wsMat['!cols'] = [{ wch: 22 }, { wch: 22 }, { wch: 28 }, { wch: 22 }, { wch: 10 }];
     XLSX.utils.book_append_sheet(wb, wsMat, 'Matériel');
+
+    // Onglet Récap heures par conducteur
+    const totalByCond = {};
+    d.equipes.forEach(eq => (eq.engins || []).forEach(e => {
+      if (!e.conducteur) return;
+      const h = parseFloat(e.heures) || 0;
+      if (!totalByCond[e.conducteur]) totalByCond[e.conducteur] = { total: 0, engins: {} };
+      totalByCond[e.conducteur].total += h;
+      totalByCond[e.conducteur].engins[e.nom] = (totalByCond[e.conducteur].engins[e.nom] || 0) + h;
+    }));
+    if (Object.keys(totalByCond).length) {
+      const condRows = [
+        ['HEURES PAR CONDUCTEUR'],
+        ['Chantier', d.chantier, 'Date', formatDateFR(d.date)],
+        [],
+        ['Conducteur', 'Engin', 'Heures'],
+      ];
+      let gt = 0;
+      Object.entries(totalByCond).forEach(([cond, data]) => {
+        Object.entries(data.engins).forEach(([engin, h]) => {
+          condRows.push([cond, engin, h]);
+        });
+        condRows.push(['', `Total ${cond}`, data.total]);
+        condRows.push([]);
+        gt += data.total;
+      });
+      condRows.push(['', 'TOTAL GÉNÉRAL', gt]);
+      const wsCond = XLSX.utils.aoa_to_sheet(condRows);
+      wsCond['!cols'] = [{ wch: 25 }, { wch: 28 }, { wch: 10 }];
+      XLSX.utils.book_append_sheet(wb, wsCond, 'Conducteurs');
+    }
   }
 
   const chan = (d.chantier || 'chantier').replace(/[^a-zA-Z0-9_-]+/g, '_').slice(0, 30);
