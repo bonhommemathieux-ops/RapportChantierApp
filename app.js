@@ -144,6 +144,17 @@ const membreTemplate = () => `
     <button type="button" class="btn-remove" data-remove>✕</button>
   </div>`;
 
+const buildFrontOptions = (extras = []) => {
+  const extrasFiltered = extras.filter(e => e && !ALL_FRONTS.includes(e));
+  const extrasHtml = extrasFiltered.length
+    ? `<optgroup label="Sous-tronçons spécifiques">${extrasFiltered.map(f => `<option value="${f}">${f}</option>`).join('')}</optgroup>`
+    : '';
+  return '<option value="">— aucun front —</option>' +
+    `<optgroup label="Secteur 2">${FRONTS_S2.map(f => `<option value="${f}">${f}</option>`).join('')}</optgroup>` +
+    `<optgroup label="Secteur 3">${FRONTS_S3.map(f => `<option value="${f}">${f}</option>`).join('')}</optgroup>` +
+    extrasHtml;
+};
+
 const equipeTemplate = () => `
   <div class="equipe-block" data-equipe>
     <div class="equipe-head">
@@ -152,7 +163,7 @@ const equipeTemplate = () => `
     </div>
     <div class="equipe-front">
       <label>🚧 Affectée au front :</label>
-      <select class="eq-front"><option value="">— aucun front —</option></select>
+      <select class="eq-front">${buildFrontOptions()}</select>
     </div>
     <div class="membres row-list"></div>
     <button type="button" class="btn-add btn-add-membre">+ Ajouter un membre</button>
@@ -167,12 +178,11 @@ const getFronts = () => [...document.querySelectorAll('#av-rues .rue-block')].ma
 }).filter(Boolean);
 
 const refreshFrontSelects = () => {
-  const fronts = getFronts();
+  const extras = getFronts().filter(f => !ALL_FRONTS.includes(f));
   document.querySelectorAll('.eq-front').forEach(sel => {
     const current = sel.value;
-    sel.innerHTML = '<option value="">— aucun front —</option>' +
-      fronts.map(f => `<option value="${f}">${f}</option>`).join('');
-    if (fronts.includes(current)) sel.value = current;
+    sel.innerHTML = buildFrontOptions(extras);
+    sel.value = current;
   });
 };
 
