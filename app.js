@@ -124,8 +124,12 @@ const MATERIEL = {
 const ALL_MATERIEL = Object.values(MATERIEL).flat();
 
 const CONDUCTEURS = [
-  'RUBEN (Lusoloc)',
-  'FERNANDO (Lusoloc)',
+  'LUSOLOC',
+  'STATR',
+  'TADIELO',
+  'KILOUTOU',
+  'CDL',
+  'LOXAM',
 ];
 
 const buildConducteurOptions = () =>
@@ -303,8 +307,8 @@ const addEnginToEquipe = (eqBlock, data = {}) => {
     <div class="row-item engin-row">
       <select class="f-select">${buildMaterielOptions()}</select>
       <input type="text" class="f-nom" placeholder="Nom libre" style="display:none" />
-      <select class="f-conducteur" title="Conducteur">${buildConducteurOptions()}</select>
-      <input type="text" class="f-conducteur-libre" placeholder="Conducteur libre" style="display:none" />
+      <select class="f-conducteur" title="Fournisseur">${buildConducteurOptions()}</select>
+      <input type="text" class="f-conducteur-libre" placeholder="Fournisseur libre" style="display:none" />
       <input type="text" class="f-heures" placeholder="Heures" />
       <button type="button" class="btn-remove" data-remove>✕</button>
     </div>`.trim();
@@ -368,7 +372,6 @@ const addTacheToEquipe = (eqBlock, data = {}) => {
     <div class="row-item av-row">
       <select class="a-tache">${TACHES.map(t => `<option value="${t}">${t}</option>`).join('')}</select>
       <select class="a-statut">${STATUTS.map(s => `<option value="${s.val}">${s.emoji} ${s.label}</option>`).join('')}</select>
-      <input type="number" class="a-prev" placeholder="Prévu" step="any" />
       <input type="number" class="a-real" placeholder="Réalisé" step="any" />
       <select class="a-unit">${UNITES.map(u => `<option value="${u}">${u}</option>`).join('')}</select>
       <button type="button" class="btn-remove" data-remove>✕</button>
@@ -376,7 +379,6 @@ const addTacheToEquipe = (eqBlock, data = {}) => {
   const row = wrap.firstChild;
   if (data.tache) row.querySelector('.a-tache').value = data.tache;
   if (data.statut) row.querySelector('.a-statut').value = data.statut;
-  if (data.prev) row.querySelector('.a-prev').value = data.prev;
   if (data.real) row.querySelector('.a-real').value = data.real;
   if (data.unit) row.querySelector('.a-unit').value = data.unit;
   eqBlock.querySelector('.taches').appendChild(row);
@@ -417,19 +419,14 @@ const updateRecap = () => {
   const byTache = {};
   taches.forEach(t => {
     const key = `${t.tache} (${t.unit})`;
-    if (!byTache[key]) byTache[key] = { prev: 0, real: 0 };
-    byTache[key].prev += parseFloat(t.prev) || 0;
+    if (!byTache[key]) byTache[key] = { real: 0 };
     byTache[key].real += parseFloat(t.real) || 0;
   });
-  recap.innerHTML = Object.entries(byTache).map(([k, v]) => {
-    const pct = v.prev ? Math.min(100, Math.round(v.real / v.prev * 100)) : 0;
-    return `
+  recap.innerHTML = Object.entries(byTache).map(([k, v]) => `
       <div class="recap-item">
         <div class="recap-title">${k}</div>
-        <div class="recap-bar"><div class="recap-fill" style="width:${pct}%"></div></div>
-        <div class="recap-nums">${v.real.toFixed(1)} / ${v.prev.toFixed(1)} <span class="recap-pct">${pct}%</span></div>
-      </div>`;
-  }).join('');
+        <div class="recap-nums">${v.real.toFixed(1)}</div>
+      </div>`).join('');
 };
 
 // =============================================================================
@@ -468,7 +465,6 @@ const collectEquipes = () => [...document.querySelectorAll('#equipes .equipe-blo
     taches: [...eq.querySelectorAll('.av-row')].map(r => ({
       tache: r.querySelector('.a-tache').value,
       statut: r.querySelector('.a-statut').value,
-      prev: r.querySelector('.a-prev').value,
       real: r.querySelector('.a-real').value,
       unit: r.querySelector('.a-unit').value,
     })),
@@ -481,6 +477,7 @@ const collectData = () => {
     date: $('date').value,
     chantier: $('chantier').value.trim(),
     redacteur: $('redacteur').value.trim(),
+    destinataire: $('destinataire') ? $('destinataire').value.trim() : '',
     meteo: state.meteo,
     equipes,
     // Vue aplatie des taches avec front (nom de rue) pour recap global
@@ -499,6 +496,7 @@ const restore = () => {
     $('date').value = d.date || new Date().toISOString().slice(0, 10);
     $('chantier').value = d.chantier || 'RCU TOULOUSE MATABIAU SECTEUR 2 - 3';
     $('redacteur').value = d.redacteur || '';
+    if ($('destinataire')) $('destinataire').value = d.destinataire || 'mathieu.bonhomme@fctp.fr';
     if (d.meteo) {
       const btn = document.querySelector(`.weather-btn[data-val="${d.meteo}"]`);
       if (btn) { btn.classList.add('active'); state.meteo = d.meteo; }
@@ -613,7 +611,7 @@ const buildPDF = async (d) => {
       if (eq.engins && eq.engins.length) {
         doc.autoTable({
           startY: y,
-          head: [['Matériel', 'Conducteur', 'Heures']],
+          head: [['Matériel', 'Fournisseur', 'Heures']],
           body: eq.engins.map(e => [e.nom, e.conducteur || '—', e.heures || '']),
           styles: { fontSize: 8, cellPadding: 1.5 },
           headStyles: { fillColor: [148, 163, 184], textColor: 255 },
@@ -625,11 +623,10 @@ const buildPDF = async (d) => {
       if (eq.taches && eq.taches.length) {
         doc.autoTable({
           startY: y,
-          head: [['Tâche', 'Statut', 'Prévu', 'Réalisé', 'Unité', '%']],
+          head: [['Tâche', 'Statut', 'Réalisé', 'Unité']],
           body: eq.taches.map(t => {
-            const pct = parseFloat(t.prev) ? Math.round((parseFloat(t.real) || 0) / parseFloat(t.prev) * 100) : 0;
             const s = STATUTS.find(x => x.val === t.statut) || STATUTS[0];
-            return [t.tache, `${s.emoji} ${s.label}`, t.prev, t.real, t.unit, pct + '%'];
+            return [t.tache, `${s.emoji} ${s.label}`, t.real, t.unit];
           }),
           styles: { fontSize: 8, cellPadding: 1.5 },
           headStyles: { fillColor: [30, 41, 59], textColor: 255 },
@@ -645,13 +642,11 @@ const buildPDF = async (d) => {
     const byTache = {};
     d.taches.forEach(t => {
       const key = `${t.tache}|${t.unit}`;
-      if (!byTache[key]) byTache[key] = { tache: t.tache, unit: t.unit, prev: 0, real: 0 };
-      byTache[key].prev += parseFloat(t.prev) || 0;
+      if (!byTache[key]) byTache[key] = { tache: t.tache, unit: t.unit, real: 0 };
       byTache[key].real += parseFloat(t.real) || 0;
     });
     const recapRows = Object.values(byTache).map(v => [
-      v.tache, v.unit, v.prev.toFixed(1), v.real.toFixed(1),
-      (v.prev ? Math.round(v.real / v.prev * 100) : 0) + '%',
+      v.tache, v.unit, v.real.toFixed(1),
     ]);
     if (recapRows.length) {
       if (y > H - 40) { doc.addPage(); y = M; }
@@ -660,7 +655,7 @@ const buildPDF = async (d) => {
       doc.text('AVANCEMENT — RÉCAP', M + 6, y + 4.5);
       doc.autoTable({
         startY: y + 8,
-        head: [['Tâche', 'Unité', 'Prévu', 'Réalisé', 'Avancement']],
+        head: [['Tâche', 'Unité', 'Réalisé']],
         body: recapRows,
         styles: { fontSize: 9, cellPadding: 2 },
         headStyles: { fillColor: [249, 115, 22], textColor: 255 },
@@ -704,8 +699,40 @@ $('btnShare').addEventListener('click', async () => {
       }));
     } catch (e) { console.warn('XLSX skip', e); }
 
-    const title = `Rapport ${d.chantier} — ${formatDateFR(d.date)}`;
-    const text = `Rapport chantier ${d.chantier} du ${formatDateFR(d.date)}.`;
+    // Résumé auto pour corps du mail
+    const nbEquipes = d.equipes ? d.equipes.length : 0;
+    const totalHeuresMembres = (d.equipes || []).reduce((s, eq) =>
+      s + (eq.membres || []).reduce((ss, m) => ss + (parseFloat(m.heures) || 0), 0), 0);
+    const totalHeuresEngins = (d.equipes || []).reduce((s, eq) =>
+      s + (eq.engins || []).reduce((ss, e) => ss + (parseFloat(e.heures) || 0), 0), 0);
+    const nbTaches = d.taches ? d.taches.length : 0;
+
+    const title = `Rapport chantier ${d.chantier} — ${formatDateFR(d.date)}`;
+    const text = `Bonjour,
+
+Veuillez trouver ci-joint le rapport journalier de chantier :
+
+• Chantier : ${d.chantier}
+• Date : ${formatDateFR(d.date)}
+• Rédigé par : ${d.redacteur || '—'}
+• Météo : ${d.meteo || '—'}
+• Équipes : ${nbEquipes}
+• Heures compagnons : ${totalHeuresMembres.toFixed(1)} h
+• Heures engins : ${totalHeuresEngins.toFixed(1)} h
+• Tâches : ${nbTaches}
+
+Fichiers joints : rapport PDF + suivi Excel.
+
+Cordialement,
+${d.redacteur || 'Mathieu Bonhomme'}`;
+
+    // Copie du destinataire dans le presse-papier pour collage dans Outlook
+    if (d.destinataire) {
+      try {
+        await navigator.clipboard.writeText(d.destinataire);
+        toast(`📋 Destinataire copié : ${d.destinataire}`, 'success');
+      } catch (e) { console.warn('clipboard copy failed', e); }
+    }
 
     const ok = await shareFiles(files, title, text);
     if (!ok) {
@@ -731,33 +758,30 @@ const buildXLSXWorkbook = (d) => {
       ['SUIVI AVANCEMENT'],
       ['Chantier', d.chantier, 'Date', formatDateFR(d.date)],
       [],
-      ['Rue / tronçon', 'Tâche', 'Statut', 'Qté prévue', 'Qté réalisée', 'Unité', 'Avancement %'],
+      ['Rue / tronçon', 'Tâche', 'Statut', 'Qté réalisée', 'Unité'],
       ...d.taches.map(t => {
-        const pct = parseFloat(t.prev) ? Math.round((parseFloat(t.real) || 0) / parseFloat(t.prev) * 100) : 0;
         const statutLabel = (STATUTS.find(s => s.val === t.statut) || {}).label || '';
-        return [t.rue, t.tache, statutLabel, parseFloat(t.prev) || 0, parseFloat(t.real) || 0, t.unit, pct + '%'];
+        return [t.rue, t.tache, statutLabel, parseFloat(t.real) || 0, t.unit];
       }),
     ];
     const wsDetail = XLSX.utils.aoa_to_sheet(detail);
-    wsDetail['!cols'] = [{ wch: 24 }, { wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 8 }, { wch: 14 }];
+    wsDetail['!cols'] = [{ wch: 24 }, { wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 8 }];
 
     const byTache = {};
     d.taches.forEach(t => {
       const key = `${t.tache}|${t.unit}`;
-      if (!byTache[key]) byTache[key] = { tache: t.tache, unit: t.unit, prev: 0, real: 0 };
-      byTache[key].prev += parseFloat(t.prev) || 0;
+      if (!byTache[key]) byTache[key] = { tache: t.tache, unit: t.unit, real: 0 };
       byTache[key].real += parseFloat(t.real) || 0;
     });
     const recapRows = [
       ['RÉCAP PAR TÂCHE'], [],
-      ['Tâche', 'Unité', 'Qté prévue', 'Qté réalisée', 'Avancement %'],
+      ['Tâche', 'Unité', 'Qté réalisée'],
       ...Object.values(byTache).map(v => [
-        v.tache, v.unit, +v.prev.toFixed(2), +v.real.toFixed(2),
-        (v.prev ? Math.round(v.real / v.prev * 100) : 0) + '%',
+        v.tache, v.unit, +v.real.toFixed(2),
       ]),
     ];
     const wsRecap = XLSX.utils.aoa_to_sheet(recapRows);
-    wsRecap['!cols'] = [{ wch: 22 }, { wch: 8 }, { wch: 14 }, { wch: 14 }, { wch: 14 }];
+    wsRecap['!cols'] = [{ wch: 22 }, { wch: 8 }, { wch: 14 }];
 
     XLSX.utils.book_append_sheet(wb, wsDetail, 'Détail');
     XLSX.utils.book_append_sheet(wb, wsRecap, 'Récap');
@@ -790,7 +814,7 @@ const buildXLSXWorkbook = (d) => {
       ['MATÉRIEL PAR FRONT'],
       ['Chantier', d.chantier, 'Date', formatDateFR(d.date)],
       [],
-      ['Équipe', 'Front', 'Matériel', 'Conducteur', 'Heures'],
+      ['Équipe', 'Front', 'Matériel', 'Fournisseur', 'Heures'],
     ];
     d.equipes.forEach(eq => {
       (eq.engins || []).forEach(e => {
@@ -811,10 +835,10 @@ const buildXLSXWorkbook = (d) => {
     }));
     if (Object.keys(totalByCond).length) {
       const condRows = [
-        ['HEURES PAR CONDUCTEUR'],
+        ['HEURES PAR FOURNISSEUR'],
         ['Chantier', d.chantier, 'Date', formatDateFR(d.date)],
         [],
-        ['Conducteur', 'Engin', 'Heures'],
+        ['Fournisseur', 'Engin', 'Heures'],
       ];
       let gt = 0;
       Object.entries(totalByCond).forEach(([cond, data]) => {
@@ -828,7 +852,7 @@ const buildXLSXWorkbook = (d) => {
       condRows.push(['', 'TOTAL GÉNÉRAL', gt]);
       const wsCond = XLSX.utils.aoa_to_sheet(condRows);
       wsCond['!cols'] = [{ wch: 25 }, { wch: 28 }, { wch: 10 }];
-      XLSX.utils.book_append_sheet(wb, wsCond, 'Conducteurs');
+      XLSX.utils.book_append_sheet(wb, wsCond, 'Fournisseurs');
     }
   }
   return wb;
