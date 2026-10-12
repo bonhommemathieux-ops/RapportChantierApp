@@ -11,7 +11,9 @@
   <link rel="stylesheet" href="style.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/fr.js"></script>
 </head>
 <body>
 
@@ -31,7 +33,7 @@
       <div class="grid">
         <div>
           <label for="date">Date</label>
-          <input type="date" id="date" lang="fr-FR" required>
+          <input type="text" id="date" placeholder="jj/mm/aaaa" required>
           <div class="date-fr" id="dateFr"></div>
         </div>
         <div>
@@ -40,7 +42,7 @@
         </div>
         <div>
           <label for="redacteur">Rédigé par</label>
-          <input type="text" id="redacteur" placeholder="Ex : Mathieu Bonhomme">
+          <input type="text" id="redacteur" value="Albino NUNES">
         </div>
         <div>
           <label for="destinataire">📧 Destinataire mail</label>
@@ -82,7 +84,6 @@
 
 <div class="actions">
   <button type="button" class="btn btn-secondary" id="btnReset" title="Réinitialiser">🗑️</button>
-  <button type="button" class="btn btn-neutral" id="btnXlsx">Excel</button>
   <button type="button" class="btn btn-share" id="btnShare" title="Partager (SMS/WhatsApp/mail)">📤 Partager</button>
 </div>
 

@@ -31,20 +31,6 @@ const updateDateFr = () => {
   el.textContent = iso ? '📅 ' + formatDateFRLong(iso) : '';
 };
 
-const shareFiles = async (files, title, text) => {
-  try {
-    if (navigator.canShare && navigator.canShare({ files })) {
-      await navigator.share({ files, title, text });
-      toast('Rapport partagé (PDF + Excel)', 'success');
-      return true;
-    }
-  } catch (err) {
-    if (err && err.name === 'AbortError') { toast('Partage annulé'); return true; }
-    console.warn('share failed', err);
-  }
-  return false;
-};
-
 const LOGO_PNG_DATAURL = () => new Promise((res) => {
   const img = new Image();
   img.onload = () => {
@@ -495,7 +481,7 @@ const restore = () => {
     const d = raw ? JSON.parse(raw) : {};
     $('date').value = d.date || new Date().toISOString().slice(0, 10);
     $('chantier').value = d.chantier || 'RCU TOULOUSE MATABIAU SECTEUR 2 - 3';
-    $('redacteur').value = d.redacteur || '';
+    $('redacteur').value = d.redacteur || 'Albino NUNES';
     if ($('destinataire')) $('destinataire').value = d.destinataire || 'mathieu.bonhomme@fctp.fr';
     if (d.meteo) {
       const btn = document.querySelector(`.weather-btn[data-val="${d.meteo}"]`);
@@ -523,6 +509,23 @@ $('form').addEventListener('change', () => { updateRecap(); updateDateFr(); pers
 
 restore();
 updateDateFr();
+
+if (window.flatpickr) {
+  const dateInput = $('date');
+  // Si la valeur n'est pas ISO (ex: déjà en jj/mm/aaaa ou vide), on force à aujourd'hui ISO
+  let current = dateInput.value;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(current)) current = new Date().toISOString().slice(0, 10);
+  dateInput.value = current;
+  window._fp_date = flatpickr(dateInput, {
+    locale: 'fr',
+    dateFormat: 'Y-m-d',
+    altInput: true,
+    altFormat: 'd/m/Y',
+    defaultDate: current,
+    allowInput: false,
+    onChange: () => { updateDateFr(); persist(); },
+  });
+}
 
 // =============================================================================
 // PDF (rapport + avancement combinés)
@@ -677,6 +680,59 @@ const buildPDF = async (d) => {
 // =============================================================================
 // ACTIONS
 // =============================================================================
+// Encode une chaîne UTF-8 en base64 (sans dépendance externe)
+const utf8ToB64 = (str) => btoa(unescape(encodeURIComponent(str)));
+
+// Encode un ArrayBuffer binaire en base64 (gère les gros fichiers par chunks)
+const bufferToB64 = (buffer) => {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+};
+
+// Formate une chaîne base64 en lignes de 76 caractères (RFC 2045)
+const b64Lines = (b64) => (b64.match(/.{1,76}/g) || []).join('\r\n');
+
+// Construit un fichier .eml complet (RFC 822 + MIME multipart) avec destinataire + corps + PJ PDF
+const buildEml = async (d, pdfBlob, pdfName, subject, body) => {
+  const pdfBuffer = await pdfBlob.arrayBuffer();
+  const pdfB64 = b64Lines(bufferToB64(pdfBuffer));
+  const bodyB64 = b64Lines(utf8ToB64(body));
+  const subjectEnc = `=?UTF-8?B?${utf8ToB64(subject)}?=`;
+  const boundary = `----=_FCTP_${Date.now()}`;
+  const date = new Date().toUTCString();
+
+  const eml = [
+    `Date: ${date}`,
+    `To: ${d.destinataire || ''}`,
+    `Subject: ${subjectEnc}`,
+    `MIME-Version: 1.0`,
+    `Content-Type: multipart/mixed; boundary="${boundary}"`,
+    ``,
+    `--${boundary}`,
+    `Content-Type: text/plain; charset=utf-8`,
+    `Content-Transfer-Encoding: base64`,
+    ``,
+    bodyB64,
+    ``,
+    `--${boundary}`,
+    `Content-Type: application/pdf; name="${pdfName}"`,
+    `Content-Disposition: attachment; filename="${pdfName}"`,
+    `Content-Transfer-Encoding: base64`,
+    ``,
+    pdfB64,
+    ``,
+    `--${boundary}--`,
+    ``,
+  ].join('\r\n');
+
+  return new Blob([eml], { type: 'message/rfc822' });
+};
+
 $('btnShare').addEventListener('click', async () => {
   const d = collectData();
   if (!d.chantier || !d.date) { toast('Renseigne au minimum le chantier et la date', 'error'); return; }
@@ -685,21 +741,11 @@ $('btnShare').addEventListener('click', async () => {
     const dateStr = d.date || new Date().toISOString().slice(0, 10);
     const cleanChantier = (d.chantier || 'chantier').replace(/[^a-zA-Z0-9_-]+/g, '_').slice(0, 40);
     const pdfName = `Rapport_${cleanChantier}_${dateStr}.pdf`;
-    const xlsName = `Rapport_${cleanChantier}_${dateStr}.xlsx`;
+    const emlName = `Rapport_${cleanChantier}_${dateStr}.eml`;
 
     const doc = await buildPDF(d);
     const pdfBlob = doc.output('blob');
-    const pdfFile = new File([pdfBlob], pdfName, { type: 'application/pdf' });
 
-    const files = [pdfFile];
-    try {
-      const xlsBlob = buildXLSXBlob(d);
-      if (xlsBlob) files.push(new File([xlsBlob], xlsName, {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      }));
-    } catch (e) { console.warn('XLSX skip', e); }
-
-    // Résumé auto pour corps du mail
     const nbEquipes = d.equipes ? d.equipes.length : 0;
     const totalHeuresMembres = (d.equipes || []).reduce((s, eq) =>
       s + (eq.membres || []).reduce((ss, m) => ss + (parseFloat(m.heures) || 0), 0), 0);
@@ -707,8 +753,8 @@ $('btnShare').addEventListener('click', async () => {
       s + (eq.engins || []).reduce((ss, e) => ss + (parseFloat(e.heures) || 0), 0), 0);
     const nbTaches = d.taches ? d.taches.length : 0;
 
-    const title = `Rapport chantier ${d.chantier} — ${formatDateFR(d.date)}`;
-    const text = `Bonjour,
+    const subject = `Rapport chantier ${d.chantier} — ${formatDateFR(d.date)}`;
+    const body = `Bonjour,
 
 Veuillez trouver ci-joint le rapport journalier de chantier :
 
@@ -721,160 +767,32 @@ Veuillez trouver ci-joint le rapport journalier de chantier :
 • Heures engins : ${totalHeuresEngins.toFixed(1)} h
 • Tâches : ${nbTaches}
 
-Fichiers joints : rapport PDF + suivi Excel.
-
 Cordialement,
 ${d.redacteur || 'Mathieu Bonhomme'}`;
 
-    // Copie du destinataire dans le presse-papier pour collage dans Outlook
-    if (d.destinataire) {
+    const emlBlob = await buildEml(d, pdfBlob, pdfName, subject, body);
+
+    // Tentative de partage natif (mobile) : propose Outlook / Gmail / etc. avec tout pré-rempli
+    const emlFile = new File([emlBlob], emlName, { type: 'message/rfc822' });
+    if (navigator.canShare && navigator.canShare({ files: [emlFile] })) {
       try {
-        await navigator.clipboard.writeText(d.destinataire);
-        toast(`📋 Destinataire copié : ${d.destinataire}`, 'success');
-      } catch (e) { console.warn('clipboard copy failed', e); }
-    }
-
-    const ok = await shareFiles(files, title, text);
-    if (!ok) {
-      // Fallback : telechargement local des 2 fichiers
-      doc.save(pdfName);
-      if (files.length > 1) {
-        const url = URL.createObjectURL(files[1]);
-        const a = document.createElement('a');
-        a.href = url; a.download = xlsName;
-        document.body.appendChild(a); a.click(); a.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        await navigator.share({ files: [emlFile], title: subject });
+        toast('✉️ Email généré — ouvre dans ton app mail', 'success');
+        return;
+      } catch (err) {
+        if (err && err.name === 'AbortError') { toast('Partage annulé'); return; }
+        console.warn('share failed', err);
       }
-      toast('Partage indisponible — PDF + Excel téléchargés', 'success');
     }
+
+    // Fallback : téléchargement du .eml (double-clic ouvre Outlook avec tout rempli)
+    const url = URL.createObjectURL(emlBlob);
+    const a = document.createElement('a');
+    a.href = url; a.download = emlName;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast('✉️ Email prêt — ouvre le fichier .eml téléchargé', 'success');
   } catch (err) { console.error(err); toast('Erreur génération', 'error'); }
-});
-
-const buildXLSXWorkbook = (d) => {
-  const wb = XLSX.utils.book_new();
-
-  if (d.taches && d.taches.length) {
-    const detail = [
-      ['SUIVI AVANCEMENT'],
-      ['Chantier', d.chantier, 'Date', formatDateFR(d.date)],
-      [],
-      ['Rue / tronçon', 'Tâche', 'Statut', 'Qté réalisée', 'Unité'],
-      ...d.taches.map(t => {
-        const statutLabel = (STATUTS.find(s => s.val === t.statut) || {}).label || '';
-        return [t.rue, t.tache, statutLabel, parseFloat(t.real) || 0, t.unit];
-      }),
-    ];
-    const wsDetail = XLSX.utils.aoa_to_sheet(detail);
-    wsDetail['!cols'] = [{ wch: 24 }, { wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 8 }];
-
-    const byTache = {};
-    d.taches.forEach(t => {
-      const key = `${t.tache}|${t.unit}`;
-      if (!byTache[key]) byTache[key] = { tache: t.tache, unit: t.unit, real: 0 };
-      byTache[key].real += parseFloat(t.real) || 0;
-    });
-    const recapRows = [
-      ['RÉCAP PAR TÂCHE'], [],
-      ['Tâche', 'Unité', 'Qté réalisée'],
-      ...Object.values(byTache).map(v => [
-        v.tache, v.unit, +v.real.toFixed(2),
-      ]),
-    ];
-    const wsRecap = XLSX.utils.aoa_to_sheet(recapRows);
-    wsRecap['!cols'] = [{ wch: 22 }, { wch: 8 }, { wch: 14 }];
-
-    XLSX.utils.book_append_sheet(wb, wsDetail, 'Détail');
-    XLSX.utils.book_append_sheet(wb, wsRecap, 'Récap');
-  }
-
-  if (d.equipes && d.equipes.length) {
-    const ptgRows = [
-      ['POINTAGE ÉQUIPES'],
-      ['Chantier', d.chantier, 'Date', formatDateFR(d.date)],
-      [],
-      ['Équipe', 'Front', 'Nom', 'Heures'],
-    ];
-    let grandTotal = 0;
-    d.equipes.forEach(eq => {
-      let totalEq = 0;
-      eq.membres.forEach(m => {
-        const h = parseFloat(m.heures) || 0;
-        totalEq += h; grandTotal += h;
-        ptgRows.push([eq.nom || '(sans nom)', eq.front || '', m.nom, h]);
-      });
-      ptgRows.push(['', '', `Total ${eq.nom || ''}`, totalEq]);
-      ptgRows.push([]);
-    });
-    ptgRows.push(['', '', 'TOTAL GÉNÉRAL', grandTotal]);
-    const wsPtg = XLSX.utils.aoa_to_sheet(ptgRows);
-    wsPtg['!cols'] = [{ wch: 22 }, { wch: 22 }, { wch: 30 }, { wch: 10 }];
-    XLSX.utils.book_append_sheet(wb, wsPtg, 'Pointage');
-
-    const matRows = [
-      ['MATÉRIEL PAR FRONT'],
-      ['Chantier', d.chantier, 'Date', formatDateFR(d.date)],
-      [],
-      ['Équipe', 'Front', 'Matériel', 'Fournisseur', 'Heures'],
-    ];
-    d.equipes.forEach(eq => {
-      (eq.engins || []).forEach(e => {
-        matRows.push([eq.nom || '(sans nom)', eq.front || '', e.nom, e.conducteur || '', parseFloat(e.heures) || 0]);
-      });
-    });
-    const wsMat = XLSX.utils.aoa_to_sheet(matRows);
-    wsMat['!cols'] = [{ wch: 22 }, { wch: 22 }, { wch: 28 }, { wch: 22 }, { wch: 10 }];
-    XLSX.utils.book_append_sheet(wb, wsMat, 'Matériel');
-
-    const totalByCond = {};
-    d.equipes.forEach(eq => (eq.engins || []).forEach(e => {
-      if (!e.conducteur) return;
-      const h = parseFloat(e.heures) || 0;
-      if (!totalByCond[e.conducteur]) totalByCond[e.conducteur] = { total: 0, engins: {} };
-      totalByCond[e.conducteur].total += h;
-      totalByCond[e.conducteur].engins[e.nom] = (totalByCond[e.conducteur].engins[e.nom] || 0) + h;
-    }));
-    if (Object.keys(totalByCond).length) {
-      const condRows = [
-        ['HEURES PAR FOURNISSEUR'],
-        ['Chantier', d.chantier, 'Date', formatDateFR(d.date)],
-        [],
-        ['Fournisseur', 'Engin', 'Heures'],
-      ];
-      let gt = 0;
-      Object.entries(totalByCond).forEach(([cond, data]) => {
-        Object.entries(data.engins).forEach(([engin, h]) => {
-          condRows.push([cond, engin, h]);
-        });
-        condRows.push(['', `Total ${cond}`, data.total]);
-        condRows.push([]);
-        gt += data.total;
-      });
-      condRows.push(['', 'TOTAL GÉNÉRAL', gt]);
-      const wsCond = XLSX.utils.aoa_to_sheet(condRows);
-      wsCond['!cols'] = [{ wch: 25 }, { wch: 28 }, { wch: 10 }];
-      XLSX.utils.book_append_sheet(wb, wsCond, 'Fournisseurs');
-    }
-  }
-  return wb;
-};
-
-const buildXLSXBlob = (d) => {
-  const wb = buildXLSXWorkbook(d);
-  if (!wb.SheetNames || !wb.SheetNames.length) return null;
-  const u8 = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
-  return new Blob([u8], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-};
-
-$('btnXlsx').addEventListener('click', () => {
-  const d = collectData();
-  if (!d.taches.length && !(d.equipes && d.equipes.length)) {
-    toast('Aucune tâche ni pointage saisi', 'error'); return;
-  }
-  const wb = buildXLSXWorkbook(d);
-  const chan = (d.chantier || 'chantier').replace(/[^a-zA-Z0-9_-]+/g, '_').slice(0, 30);
-  const dt = d.date || new Date().toISOString().slice(0, 10);
-  XLSX.writeFile(wb, `Rapport_${chan}_${dt}.xlsx`);
-  toast('Fichier Excel téléchargé', 'success');
 });
 
 $('btnReset').addEventListener('click', () => {
