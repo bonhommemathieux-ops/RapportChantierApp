@@ -697,13 +697,15 @@ const bufferToB64 = (buffer) => {
 // Formate une chaîne base64 en lignes de 76 caractères (RFC 2045)
 const b64Lines = (b64) => (b64.match(/.{1,76}/g) || []).join('\r\n');
 
-// Construit un fichier .eml complet (RFC 822 + MIME multipart) avec destinataire + corps + PJ PDF
-const buildEml = async (d, pdfBlob, pdfName, subject, body) => {
+// Construit un fichier .eml complet (RFC 822 + MIME multipart) avec destinataire + corps HTML + PJ PDF
+const buildEml = async (d, pdfBlob, pdfName, subject, bodyPlain, bodyHtml) => {
   const pdfBuffer = await pdfBlob.arrayBuffer();
   const pdfB64 = b64Lines(bufferToB64(pdfBuffer));
-  const bodyB64 = b64Lines(utf8ToB64(body));
+  const bodyPlainB64 = b64Lines(utf8ToB64(bodyPlain));
+  const bodyHtmlB64 = b64Lines(utf8ToB64(bodyHtml));
   const subjectEnc = `=?UTF-8?B?${utf8ToB64(subject)}?=`;
-  const boundary = `----=_FCTP_${Date.now()}`;
+  const mixed = `----=_FCTP_MIXED_${Date.now()}`;
+  const alt = `----=_FCTP_ALT_${Date.now()}`;
   const date = new Date().toUTCString();
 
   const eml = [
@@ -711,27 +713,41 @@ const buildEml = async (d, pdfBlob, pdfName, subject, body) => {
     `To: ${d.destinataire || ''}`,
     `Subject: ${subjectEnc}`,
     `MIME-Version: 1.0`,
-    `Content-Type: multipart/mixed; boundary="${boundary}"`,
+    `Content-Type: multipart/mixed; boundary="${mixed}"`,
     ``,
-    `--${boundary}`,
+    `--${mixed}`,
+    `Content-Type: multipart/alternative; boundary="${alt}"`,
+    ``,
+    `--${alt}`,
     `Content-Type: text/plain; charset=utf-8`,
     `Content-Transfer-Encoding: base64`,
     ``,
-    bodyB64,
+    bodyPlainB64,
     ``,
-    `--${boundary}`,
+    `--${alt}`,
+    `Content-Type: text/html; charset=utf-8`,
+    `Content-Transfer-Encoding: base64`,
+    ``,
+    bodyHtmlB64,
+    ``,
+    `--${alt}--`,
+    ``,
+    `--${mixed}`,
     `Content-Type: application/pdf; name="${pdfName}"`,
     `Content-Disposition: attachment; filename="${pdfName}"`,
     `Content-Transfer-Encoding: base64`,
     ``,
     pdfB64,
     ``,
-    `--${boundary}--`,
+    `--${mixed}--`,
     ``,
   ].join('\r\n');
 
   return new Blob([eml], { type: 'message/rfc822' });
 };
+
+const htmlEscape = (s) => String(s == null ? '' : s)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 $('btnShare').addEventListener('click', async () => {
   const d = collectData();
@@ -754,7 +770,8 @@ $('btnShare').addEventListener('click', async () => {
     const nbTaches = d.taches ? d.taches.length : 0;
 
     const subject = `Rapport chantier ${d.chantier} — ${formatDateFR(d.date)}`;
-    const body = `Bonjour,
+    const sender = d.redacteur || 'Mathieu Bonhomme';
+    const bodyPlain = `Bonjour,
 
 Veuillez trouver ci-joint le rapport journalier de chantier :
 
@@ -768,30 +785,61 @@ Veuillez trouver ci-joint le rapport journalier de chantier :
 • Tâches : ${nbTaches}
 
 Cordialement,
-${d.redacteur || 'Mathieu Bonhomme'}`;
+${sender}`;
 
-    const emlBlob = await buildEml(d, pdfBlob, pdfName, subject, body);
+    const rows = [
+      ['Chantier',          d.chantier],
+      ['Date',              formatDateFR(d.date)],
+      ['Rédigé par',        d.redacteur || '—'],
+      ['Météo',             d.meteo || '—'],
+      ['Équipes',           nbEquipes],
+      ['Heures compagnons', totalHeuresMembres.toFixed(1) + ' h'],
+      ['Heures engins',     totalHeuresEngins.toFixed(1) + ' h'],
+      ['Tâches',            nbTaches],
+    ].map(([k,v]) =>
+      `<tr><td style="padding:6px 12px 6px 0;color:#555;font-weight:600;white-space:nowrap">${htmlEscape(k)}</td>` +
+      `<td style="padding:6px 0">${htmlEscape(v)}</td></tr>`
+    ).join('');
 
-    // Tentative de partage natif (mobile) : propose Outlook / Gmail / etc. avec tout pré-rempli
-    const emlFile = new File([emlBlob], emlName, { type: 'message/rfc822' });
-    if (navigator.canShare && navigator.canShare({ files: [emlFile] })) {
+    const bodyHtml =
+`<!doctype html><html><body style="margin:0;padding:0;background:#f6f7f9;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#222">
+<div style="max-width:620px;margin:24px auto;background:#fff;border-radius:10px;overflow:hidden;border:1px solid #e3e6ea">
+  <div style="background:#0b4b8f;color:#fff;padding:16px 22px">
+    <div style="font-size:18px;font-weight:700;letter-spacing:0.3px">FCTP — Rapport journalier de chantier</div>
+    <div style="font-size:13px;opacity:.9;margin-top:2px">${htmlEscape(d.chantier)} — ${htmlEscape(formatDateFR(d.date))}</div>
+  </div>
+  <div style="padding:20px 22px">
+    <p style="margin:0 0 14px 0;font-size:14px">Bonjour,</p>
+    <p style="margin:0 0 14px 0;font-size:14px">Veuillez trouver ci-joint le rapport journalier de chantier :</p>
+    <table style="border-collapse:collapse;font-size:14px;margin:4px 0 14px 0">${rows}</table>
+    <p style="margin:14px 0 4px 0;font-size:14px">Cordialement,</p>
+    <p style="margin:0;font-size:14px;font-weight:600">${htmlEscape(sender)}</p>
+  </div>
+  <div style="background:#f0f2f5;color:#666;font-size:11px;text-align:center;padding:10px 22px">
+    Rapport généré via l'application FCTP · PDF détaillé en pièce jointe
+  </div>
+</div>
+</body></html>`;
+
+    // Partage natif (Samsung/Android/iOS) → l'utilisateur choisit Notes dans le menu système
+    const pdfFile = new File([pdfBlob], pdfName, { type: 'application/pdf' });
+    if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
       try {
-        await navigator.share({ files: [emlFile], title: subject });
-        toast('✉️ Email généré — ouvre dans ton app mail', 'success');
+        await navigator.share({ files: [pdfFile], title: subject });
+        toast('📤 PDF partagé', 'success');
         return;
       } catch (err) {
         if (err && err.name === 'AbortError') { toast('Partage annulé'); return; }
         console.warn('share failed', err);
       }
     }
-
-    // Fallback : téléchargement du .eml (double-clic ouvre Outlook avec tout rempli)
-    const url = URL.createObjectURL(emlBlob);
+    // Fallback PC / navigateur sans Web Share : téléchargement direct
+    const url = URL.createObjectURL(pdfBlob);
     const a = document.createElement('a');
-    a.href = url; a.download = emlName;
+    a.href = url; a.download = pdfName;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    toast('✉️ Email prêt — ouvre le fichier .eml téléchargé', 'success');
+    toast('📄 PDF téléchargé — ' + pdfName, 'success');
   } catch (err) { console.error(err); toast('Erreur génération', 'error'); }
 });
 
